@@ -2,6 +2,16 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Cached market data — reproducible from source, not worth versioning
 data_store/
 *.parquet
+
+# Secrets. This repo is public: nothing below ever gets committed.
 .env
+.env.*
+!.env.example
+secrets.*
+credentials.*
+*.key
+*.pem
