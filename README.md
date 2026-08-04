@@ -70,6 +70,73 @@ Design notes, since they are decisions rather than taste:
 - Light and dark are both designed sets from a CVD-validated palette, not an
   automatic inversion.
 
+## Validating a strategy
+
+```bash
+py -3 scripts/research.py SPY
+```
+
+Walk-forward: pick parameters on a 3-year training window, score them on the
+next unseen 6 months, roll, repeat. Only test windows are scored, and they are
+stitched into one out-of-sample curve.
+
+Read three columns before the return:
+
+| Column | Meaning | Bar |
+|---|---|---|
+| `trials` | parameter sets searched | more trials = weaker claim |
+| `keep` | out-of-sample Sharpe / in-sample Sharpe | 50–70% is healthy |
+| `DSR` | deflated Sharpe — probability it is not selection luck | below 0.95 is not evidence |
+
+The deflated Sharpe exists because roughly **three trials is enough to
+manufacture a strategy that looks significant with no edge**. It raises the bar
+in proportion to how hard you looked. The benchmark row — buy & hold over the
+same out-of-sample window — is there because a strategy that beats zero but
+loses to doing nothing is not an edge, just an expensive way to own less market.
+
+**Current status: every strategy in this repo is REJECTED.** That is the
+harness working. See `scripts/research.py` output for the table.
+
+## Strategies
+
+| File | Idea |
+|---|---|
+| `buy_and_hold.py` | benchmark; everything must beat this after costs |
+| `sma_cross.py` | fast/slow moving-average crossover |
+| `momentum.py` | time-series momentum — long while trailing return is positive |
+| `vol_target.py` | momentum sized by inverse realised volatility |
+| `rsi_reversion.py` | buy oversold, exit on the bounce |
+| `donchian.py` | Turtle channel breakout |
+
+## Execution — the safety model
+
+```bash
+py -3 scripts/trade.py SPY              # simulated broker, dry run
+py -3 scripts/trade.py SPY --alpaca     # Alpaca paper account, dry run
+py -3 scripts/trade.py SPY --alpaca --live   # submits paper orders
+```
+
+Four layers, every one defaulting to *not trading*:
+
+1. **`enable_trading` is False by default.** The loop computes and journals
+   everything and submits nothing. Run it this way for weeks; the journal is
+   the record of what it would have done.
+2. **Kill switch file.** `touch HALT` in the repo root stops the loop on its
+   next cycle — no code edit, no restart, doable in a panic from any device.
+3. **Risk limits per order** — position notional, orders per day, daily loss.
+   A breach blocks the whole cycle rather than shrinking the order, because a
+   strategy asking for something absurd is a bug, not a sizing problem.
+4. **`journal.jsonl`** records every cycle for reconciliation against what the
+   broker actually did.
+
+The Alpaca adapter **refuses any non-paper endpoint in its constructor**, so
+this cannot be pointed at real money by editing a config string.
+
+Backtest and live share one sizing function (`execution/sizing.py`). If they
+diverged, every backtest number would describe a system that isn't the one
+running — and you would only find out months later, as unexplained
+underperformance.
+
 ## The four stages
 
 Each stage ships before the next starts. The temptation is to skip to stage 3;

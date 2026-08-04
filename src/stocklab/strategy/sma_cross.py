@@ -27,6 +27,7 @@ class SmaCross:
         if len(close) < self.slow:
             return {}
 
-        fast_avg = close.iloc[-self.fast :].mean()
-        slow_avg = close.iloc[-self.slow :].mean()
+        values = close.to_numpy(dtype=float, copy=False)
+        fast_avg = values[-self.fast :].mean()
+        slow_avg = values[-self.slow :].mean()
         return {self.symbol: 1.0 if fast_avg > slow_avg else 0.0}

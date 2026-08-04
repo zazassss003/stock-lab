@@ -21,6 +21,10 @@ from .strategy.sma_cross import SmaCross
 # Long weekends and holidays make three days normal; five is not.
 STALE_AFTER_DAYS = 5
 
+# Ignore drift below 2% of equity. Shared with scripts/research.py so the
+# dashboard and the validation sweep describe the same system.
+REBALANCE_BAND = 0.02
+
 # Anchored to the repo, not the working directory: a scheduled run launches
 # from wherever the scheduler chooses, and a relative cache path would quietly
 # start a second, empty cache there.
@@ -33,9 +37,12 @@ def refresh_and_report(symbol: str = "SPY", output: str | Path = "dashboard.html
     source = YFinanceSource(cache_dir=CACHE_DIR)
     bars = source.fetch([symbol])
 
+    # Same band the research sweep uses: without it, drift correction alone
+    # generates a trade every bar and the fees swamp the signal.
+    run_kwargs = {"rebalance_band": REBALANCE_BAND}
     results = {
-        "buy_hold": ("Buy & hold", engine.run(bars, BuyAndHold())),
-        "sma_cross": ("SMA 20/50", engine.run(bars, SmaCross(symbol, 20, 50))),
+        "buy_hold": ("Buy & hold", engine.run(bars, BuyAndHold(), **run_kwargs)),
+        "sma_cross": ("SMA 20/50", engine.run(bars, SmaCross(symbol, 20, 50), **run_kwargs)),
     }
 
     payload = build_payload(symbol, bars, results)

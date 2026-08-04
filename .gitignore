@@ -11,6 +11,10 @@ data_store/
 dashboard.html
 update.log
 
+# Live-loop state: local to a run, and the kill switch is an operator action
+journal.jsonl
+HALT
+
 # Secrets. This repo is public: nothing below ever gets committed.
 .env
 .env.*
