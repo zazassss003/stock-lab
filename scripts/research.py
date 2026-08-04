@@ -88,7 +88,7 @@ def main() -> None:
 
     header = (
         f"{'strategy':<24}{'cfgs':>5}{'evals':>7}{'OOS ret':>9}"
-        f"{'sharpe':>8}{'maxDD':>8}{'keep':>7}{'DSR':>6}{'DSRc':>6}"
+        f"{'sharpe':>8}{'maxDD':>8}{'keep':>7}{'DSR':>7}{'DSRc':>7}"
     )
     print(header)
     print("-" * len(header))
@@ -107,7 +107,9 @@ def main() -> None:
             f"{name:<24}{int(s['configs']):>5}{int(s['trials']):>7}"
             f"{s['oos_total_return']:>9.1%}{s['oos_sharpe']:>8.2f}"
             f"{s['oos_max_drawdown']:>8.1%}{s['retention']:>7.0%}"
-            f"{s['deflated_sharpe']:>6.2f}{s['deflated_sharpe_by_config']:>6.2f}"
+            # Three decimals: at two, 0.9497 and 0.9503 both print as 0.95 and
+            # the table appears to contradict its own verdict.
+            f"{s['deflated_sharpe']:>7.3f}{s['deflated_sharpe_by_config']:>7.3f}"
         )
         verdicts.append((name, result.verdict))
 
@@ -119,7 +121,7 @@ def main() -> None:
         print(
             f"{'Buy & hold (benchmark)':<24}{'-':>5}{1:>7}"
             f"{benchmark['total_return']:>9.1%}{benchmark['sharpe']:>8.2f}"
-            f"{benchmark['max_drawdown']:>8.1%}{'-':>7}{'-':>6}{'-':>6}"
+            f"{benchmark['max_drawdown']:>8.1%}{'-':>7}{'-':>7}{'-':>7}"
         )
 
     print("\nVerdicts")
