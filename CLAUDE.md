@@ -45,9 +45,17 @@ src/stocklab/
   backtest/    the engine — treat as the test suite for every strategy
   execution/   Broker protocol; paper adapter only
   report/      dashboard payload + self-contained HTML template
+  research/    the briefing page; the one place LLM output is displayed
 tests/         pytest; test_no_lookahead.py is the load-bearing one
 docs/          SPEC.zh-TW.md — owner-facing manual (see rule 6)
 ```
+
+`research/` is the exception that proves rule 2, and it stays legal by being a
+dead end. Nothing in `strategy/`, `backtest/`, or `execution/` may import it;
+model-written notes land in `research_store/notes.json` for a human to read, and
+the renderer is the only consumer. If a change would let note content reach a
+signal, a position size, or an order, it is the wrong change — say so rather
+than finding a way to do it.
 
 ## Conventions
 
