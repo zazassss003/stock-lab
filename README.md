@@ -33,6 +33,11 @@ Design notes, since they are decisions rather than taste:
 - **Colour follows the entity.** A strategy keeps its hue everywhere it
   appears — curve, drawdown, legend, table — so filtering never repaints it.
 - **Every chart has a table twin.** No value is reachable only by hovering.
+  This is a requirement, not a nicety: the SMA 50 hue measures 2.74:1 against
+  the light surface, and the price chart suppresses its direct labels where the
+  three lines converge — without the table that series would be encoded by
+  colour alone. The palette is otherwise validated in both modes (worst
+  adjacent CVD ΔE 9.2 light / 9.4 dark against an ≥8 target).
 - Light and dark are both designed sets from a CVD-validated palette, not an
   automatic inversion.
 

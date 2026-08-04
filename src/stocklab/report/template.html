@@ -223,6 +223,16 @@
     </div>
   </div>
 
+  <h2>Chart data <span class="chart-sub">— every plotted value, reachable without hovering</span></h2>
+  <div class="filter-group" style="margin-bottom:10px">
+    <div class="seg" id="dataSeg" role="group" aria-label="Data table view"></div>
+  </div>
+  <div class="card table-wrap">
+    <div class="scroll-body">
+      <table id="dataTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
   <h2>Strategy comparison</h2>
   <div class="card table-wrap">
     <table id="compareTable"><thead></thead><tbody></tbody></table>
@@ -250,7 +260,41 @@ const RANGES = [
   { id: "5y", label: "5Y", days: 1260 },
   { id: "all", label: "All", days: Infinity },
 ];
-let state = { range: "all", focus: KEYS[0] };
+let state = { range: "all", focus: KEYS[0], dataView: "price" };
+
+/* The table twin for the charts. It is not a nicety: the light-mode SMA 50
+   hue sits at 2.74:1 against the surface (validator WARN), and the price
+   chart's direct labels are suppressed where the three lines converge — so
+   without this table that series would be encoded by colour alone. */
+const DATA_VIEWS = [
+  {
+    id: "price",
+    label: "Price & indicators",
+    columns: ["Date", "Close", "SMA 20", "SMA 50", "RSI 14"],
+    row: (i) => [
+      DATA.dates[i],
+      num(DATA.price.close[i]),
+      num(DATA.price.sma20[i]),
+      num(DATA.price.sma50[i]),
+      num(DATA.price.rsi[i], 1),
+    ],
+  },
+  {
+    id: "equity",
+    label: "Equity & drawdown",
+    /* Qualify each drawdown column — two headers both reading "Drawdown"
+       are ambiguous, and worse for a screen reader than for the eye. */
+    columns: ["Date"].concat(
+      KEYS.flatMap((k) => [DATA.strategies[k].label, DATA.strategies[k].label + " drawdown"]),
+    ),
+    row: (i) => [DATA.dates[i]].concat(
+      KEYS.flatMap((k) => [
+        money(DATA.strategies[k].equity[i]),
+        DATA.strategies[k].drawdown[i] == null ? "—" : DATA.strategies[k].drawdown[i].toFixed(1) + "%",
+      ]),
+    ),
+  },
+];
 
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const pct = (v, d = 1) => (v == null ? "—" : (v * 100).toFixed(d) + "%");
@@ -567,6 +611,28 @@ function renderTables() {
   }
 }
 
+function renderDataTable() {
+  const view = DATA_VIEWS.find((v) => v.id === state.dataView);
+  const table = document.getElementById("dataTable");
+  const head = table.querySelector("thead");
+  const body = table.querySelector("tbody");
+  head.textContent = "";
+  body.textContent = "";
+
+  const hr = document.createElement("tr");
+  for (const c of view.columns) hr.appendChild(document.createElement("th")).textContent = c;
+  head.appendChild(hr);
+
+  /* One fragment, one reflow — this can be 1,200+ rows. */
+  const frag = document.createDocumentFragment();
+  for (let i = DATA.dates.length - 1; i >= sliceStart(); i--) {
+    const tr = document.createElement("tr");
+    for (const cell of view.row(i)) tr.appendChild(document.createElement("td")).textContent = cell;
+    frag.appendChild(tr);
+  }
+  body.appendChild(frag);
+}
+
 function renderAll() {
   charts.length = 0;
   document.querySelectorAll(".tip").forEach((t) => t.remove());
@@ -607,6 +673,7 @@ function renderAll() {
   });
 
   renderTables();
+  renderDataTable();
 }
 
 /* ------------------------------------------------------------------ chrome */
@@ -631,11 +698,21 @@ function buildSegments() {
     b.dataset.group = "focus"; b.dataset.id = k;
     focusHost.appendChild(b);
   }
+  const dataHost = document.getElementById("dataSeg");
+  for (const v of DATA_VIEWS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = v.label;
+    b.setAttribute("aria-pressed", String(state.dataView === v.id));
+    b.onclick = () => { state.dataView = v.id; syncPressed(); renderDataTable(); };
+    b.dataset.group = "dataView"; b.dataset.id = v.id;
+    dataHost.appendChild(b);
+  }
 }
 function syncPressed() {
+  /* data-group names the state key, so every segmented control syncs the same way */
   document.querySelectorAll(".seg button").forEach((b) => {
-    const on = b.dataset.group === "range" ? state.range === b.dataset.id : state.focus === b.dataset.id;
-    b.setAttribute("aria-pressed", String(on));
+    b.setAttribute("aria-pressed", String(state[b.dataset.group] === b.dataset.id));
   });
 }
 
