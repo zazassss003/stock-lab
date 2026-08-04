@@ -7,6 +7,9 @@ __pycache__/
 data_store/
 *.parquet
 
+# Generated report: a data snapshot, regenerate with scripts/dashboard.py
+dashboard.html
+
 # Secrets. This repo is public: nothing below ever gets committed.
 .env
 .env.*

@@ -15,6 +15,27 @@ pip install -r requirements.txt
 py -3 -m pytest
 ```
 
+## Dashboard
+
+```bash
+py -3 scripts/dashboard.py SPY
+```
+
+Writes `dashboard.html` — a standalone page with no server and no external
+requests, openable straight from disk. Equity curve, drawdown, price with
+moving averages, RSI, a strategy comparison table and the full trade list.
+
+Design notes, since they are decisions rather than taste:
+
+- **Drawdown is its own chart, not a second y-axis.** Two y-scales on one plot
+  align arbitrarily and invent correlations that are not in the data. The two
+  charts share an x-axis and a linked crosshair instead.
+- **Colour follows the entity.** A strategy keeps its hue everywhere it
+  appears — curve, drawdown, legend, table — so filtering never repaints it.
+- **Every chart has a table twin.** No value is reachable only by hovering.
+- Light and dark are both designed sets from a CVD-validated palette, not an
+  automatic inversion.
+
 ## The four stages
 
 Each stage ships before the next starts. The temptation is to skip to stage 3;

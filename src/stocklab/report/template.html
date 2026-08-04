@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stock-lab dashboard</title>
+<style>
+  /* ---- Roles, not raw hex. Light and dark are both designed sets. ---- */
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --hover-wash: rgba(11, 11, 11, 0.04);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --delta-good: #006300;
+    --delta-bad: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --hover-wash: rgba(255, 255, 255, 0.06);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --delta-good: #0ca30c;
+      --delta-bad: #d03b3b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --hover-wash: rgba(255, 255, 255, 0.06);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --delta-good: #0ca30c;
+    --delta-bad: #d03b3b;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+
+  /* ---- Header ---- */
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 22px; }
+  .brand { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+  h1 { font-size: 26px; font-weight: 600; margin: 2px 0 0; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin-top: 3px; }
+  .theme-btn {
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
+    border-radius: 8px; padding: 7px 13px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .theme-btn:hover { background: var(--hover-wash); }
+
+  /* ---- One filter row, above everything it scopes ---- */
+  .filters {
+    display: flex; gap: 26px; align-items: center; flex-wrap: wrap;
+    padding: 12px 16px; margin-bottom: 20px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .filter-group { display: flex; align-items: center; gap: 9px; }
+  .filter-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+  .seg button {
+    border: 0; background: transparent; color: var(--text-secondary);
+    font: inherit; font-size: 13px; padding: 5px 12px; cursor: pointer; min-height: 30px;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button:hover { background: var(--hover-wash); }
+  .seg button[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); font-weight: 600; }
+
+  /* ---- Hero + stat tiles ---- */
+  .figures { display: grid; grid-template-columns: minmax(210px, 1.1fr) repeat(auto-fit, minmax(126px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 15px 17px; }
+  .tile-label { font-size: 12px; color: var(--text-muted); }
+  .tile-value { font-size: 21px; font-weight: 600; margin-top: 4px; letter-spacing: -0.01em; }
+  .hero .tile-value { font-size: 48px; line-height: 1.08; margin-top: 2px; letter-spacing: -0.025em; }
+  .tile-note { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+  .up { color: var(--delta-good); }
+  .down { color: var(--delta-bad); }
+
+  /* ---- Chart cards ---- */
+  .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px 12px; margin-bottom: 14px; position: relative; }
+  .chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .chart-title { font-size: 15px; font-weight: 600; }
+  .chart-sub { font-size: 12px; color: var(--text-muted); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-secondary); }
+  .legend-key { width: 14px; height: 2px; border-radius: 1px; flex: none; }
+  .legend-key.area { height: 9px; border-radius: 2px; opacity: 0.55; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .axis-line { stroke: var(--axis); stroke-width: 1; }
+  .tick-text { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .end-label { fill: var(--text-primary); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .crosshair { stroke: var(--axis); stroke-width: 1; pointer-events: none; }
+  .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 780px) { .two-up { grid-template-columns: 1fr; } }
+
+  /* ---- Tooltip: values lead, labels follow ---- */
+  .tip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity 0.08s;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; min-width: 132px; z-index: 5;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.13);
+  }
+  .tip-date { color: var(--text-muted); margin-bottom: 5px; font-variant-numeric: tabular-nums; }
+  .tip-row { display: flex; align-items: center; gap: 7px; margin-top: 3px; }
+  .tip-key { width: 11px; height: 2px; border-radius: 1px; flex: none; }
+  .tip-name { color: var(--text-secondary); flex: 1; }
+  .tip-val { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---- Tables: the WCAG-clean twin of every chart ---- */
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: right; padding: 8px 11px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+  th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  tbody tr:hover { background: var(--hover-wash); }
+  .row-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
+  .scroll-body { max-height: 340px; overflow-y: auto; }
+  h2 { font-size: 15px; font-weight: 600; margin: 26px 0 10px; }
+  footer { margin-top: 30px; color: var(--text-muted); font-size: 12px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="brand">stock-lab</div>
+      <h1 id="title">—</h1>
+      <div class="sub" id="subtitle">—</div>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button">Dark theme</button>
+  </header>
+
+  <div class="filters">
+    <div class="filter-group">
+      <span class="filter-label">Range</span>
+      <div class="seg" id="rangeSeg" role="group" aria-label="Date range"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Focus</span>
+      <div class="seg" id="focusSeg" role="group" aria-label="Focused strategy"></div>
+    </div>
+  </div>
+
+  <div class="figures" id="figures"></div>
+
+  <div class="chart-card">
+    <div class="chart-head">
+      <div>
+        <div class="chart-title">Equity curve</div>
+        <div class="chart-sub">Portfolio value, costs included</div>
+      </div>
+      <div class="legend" id="equityLegend"></div>
+    </div>
+    <div id="equityChart"></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-head">
+      <div>
+        <div class="chart-title">Drawdown</div>
+        <div class="chart-sub">Percent below the running peak — how much pain, for how long</div>
+      </div>
+      <div class="legend" id="ddLegend"></div>
+    </div>
+    <div id="ddChart"></div>
+  </div>
+
+  <div class="two-up">
+    <div class="chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Price &amp; moving averages</div>
+          <div class="chart-sub">The crossover signal, visualised</div>
+        </div>
+      </div>
+      <div class="legend" id="priceLegend" style="margin-bottom:8px"></div>
+      <div id="priceChart"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">RSI (14)</div>
+          <div class="chart-sub">Above 70 overbought, below 30 oversold</div>
+        </div>
+      </div>
+      <div id="rsiChart"></div>
+    </div>
+  </div>
+
+  <h2>Strategy comparison</h2>
+  <div class="card table-wrap">
+    <table id="compareTable"><thead></thead><tbody></tbody></table>
+  </div>
+
+  <h2>Trades <span class="chart-sub" id="tradeCount"></span></h2>
+  <div class="card table-wrap">
+    <div class="scroll-body">
+      <table id="tradesTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+const DATA = __PAYLOAD__;
+
+/* ------------------------------------------------------------------ state */
+const KEYS = Object.keys(DATA.strategies);
+const COLOR = { [KEYS[0]]: "--series-1", [KEYS[1]]: "--series-2" };
+const RANGES = [
+  { id: "1y", label: "1Y", days: 252 },
+  { id: "3y", label: "3Y", days: 756 },
+  { id: "5y", label: "5Y", days: 1260 },
+  { id: "all", label: "All", days: Infinity },
+];
+let state = { range: "all", focus: KEYS[0] };
+
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const pct = (v, d = 1) => (v == null ? "—" : (v * 100).toFixed(d) + "%");
+const money = (v) => (v == null ? "—" : "$" + Math.round(v).toLocaleString("en-US"));
+const num = (v, d = 2) => (v == null ? "—" : v.toFixed(d));
+
+function sliceStart() {
+  const days = RANGES.find((r) => r.id === state.range).days;
+  return Math.max(0, DATA.dates.length - days);
+}
+
+/* ------------------------------------------------------------------ charts */
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}) => {
+  const node = document.createElementNS(NS, tag);
+  for (const key in attrs) node.setAttribute(key, attrs[key]);
+  return node;
+};
+
+function niceTicks(min, max, count = 5) {
+  const span = (max - min) || 1;
+  const rough = span / (count - 1);
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  const ticks = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) ticks.push(v);
+  return ticks;
+}
+
+const charts = [];
+
+/* spec: { host, series:[{key,label,values,color,area}], height, format, sharedX, zeroTop } */
+function drawChart(spec) {
+  const host = document.getElementById(spec.host);
+  host.textContent = "";
+
+  const i0 = sliceStart();
+  const dates = DATA.dates.slice(i0);
+  const series = spec.series.map((s) => ({ ...s, data: s.values.slice(i0) }));
+
+  /* viewBox units ARE pixels: a scaled viewBox shrinks 11px axis text along
+     with the geometry, which is illegible once a chart sits in a half-width
+     column. Re-measured on resize below. */
+  const W = Math.max(360, Math.round(host.clientWidth) || 1000);
+  const H = spec.height || 250;
+  const padL = 58, padR = 66, padT = 12, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  let lo = Infinity, hi = -Infinity;
+  for (const s of series) for (const v of s.data) {
+    if (v == null) continue;
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  if (!isFinite(lo)) { lo = 0; hi = 1; }
+  if (spec.zeroTop) hi = 0;
+  const pad = (hi - lo) * 0.08 || 1;
+  lo -= pad; hi += spec.zeroTop ? 0 : pad;
+
+  const X = (i) => padL + (dates.length < 2 ? 0 : (i / (dates.length - 1)) * plotW);
+  const Y = (v) => padT + (1 - (v - lo) / (hi - lo)) * plotH;
+
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": spec.aria || "chart" });
+
+  /* recessive hairline grid, solid — never dashed */
+  for (const t of niceTicks(lo, hi)) {
+    if (t < lo || t > hi) continue;
+    svg.appendChild(el("line", { class: "grid-line", x1: padL, x2: padL + plotW, y1: Y(t), y2: Y(t) }));
+    const label = el("text", { class: "tick-text", x: padL - 9, y: Y(t) + 3.5, "text-anchor": "end" });
+    label.textContent = spec.format(t);
+    svg.appendChild(label);
+  }
+  svg.appendChild(el("line", { class: "axis-line", x1: padL, x2: padL + plotW, y1: padT + plotH, y2: padT + plotH }));
+
+  /* x ticks: first, middles, last */
+  const stops = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * (dates.length - 1)));
+  stops.forEach((i, n) => {
+    const t = el("text", {
+      class: "tick-text", x: X(i), y: H - 8,
+      "text-anchor": n === 0 ? "start" : n === stops.length - 1 ? "end" : "middle",
+    });
+    t.textContent = dates[i] ? dates[i].slice(0, 7) : "";
+    svg.appendChild(t);
+  });
+
+  /* marks: 2px lines, ~10% area wash */
+  for (const s of series) {
+    const color = cssVar(s.color);
+    let d = "", open = false;
+    s.data.forEach((v, i) => {
+      if (v == null) { open = false; return; }
+      d += (open ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1) + " ";
+      open = true;
+    });
+    if (!d) continue;
+
+    if (s.area) {
+      const base = Y(spec.zeroTop ? 0 : lo);
+      const first = s.data.findIndex((v) => v != null);
+      svg.appendChild(el("path", {
+        d: `M${X(first).toFixed(1)} ${base} ` + d.slice(1) + `L${X(s.data.length - 1).toFixed(1)} ${base} Z`,
+        fill: color, "fill-opacity": 0.10, stroke: "none",
+      }));
+    }
+    svg.appendChild(el("path", {
+      d, fill: "none", stroke: color, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round",
+    }));
+  }
+
+  /* end markers + selective direct labels; skip labels that would collide */
+  const ends = series.map((s) => {
+    let i = s.data.length - 1;
+    while (i >= 0 && s.data[i] == null) i--;
+    return i < 0 ? null : { s, i, y: Y(s.data[i]), v: s.data[i] };
+  }).filter(Boolean);
+
+  const collides = ends.some((a, ai) => ends.some((b, bi) => bi > ai && Math.abs(a.y - b.y) < 16));
+  for (const e of ends) {
+    const color = cssVar(e.s.color);
+    svg.appendChild(el("circle", { cx: X(e.i), cy: e.y, r: 4, fill: color, stroke: cssVar("--surface-1"), "stroke-width": 2 }));
+    if (!collides) {
+      /* text wears ink, never the series colour — the dot beside it carries identity */
+      const label = el("text", { class: "end-label", x: X(e.i) + 9, y: e.y + 3.5 });
+      label.textContent = spec.format(e.v);
+      svg.appendChild(label);
+    }
+  }
+
+  /* hover layer: crosshair snaps to the nearest X, one tooltip lists every series */
+  const cross = el("line", { class: "crosshair", y1: padT, y2: padT + plotH, x1: 0, x2: 0, opacity: 0 });
+  svg.appendChild(cross);
+  const dots = series.map(() => {
+    const c = el("circle", { r: 4, opacity: 0, stroke: cssVar("--surface-1"), "stroke-width": 2 });
+    svg.appendChild(c);
+    return c;
+  });
+  const hit = el("rect", { x: padL, y: padT, width: plotW, height: plotH, fill: "transparent", style: "cursor:crosshair" });
+  svg.appendChild(hit);
+  host.appendChild(svg);
+
+  const tip = document.createElement("div");
+  tip.className = "tip";
+  host.parentElement.appendChild(tip);
+
+  const chart = { spec, series, dates, X, Y, cross, dots, tip, host, padL, plotW };
+  charts.push(chart);
+
+  const locate = (evt) => {
+    const box = svg.getBoundingClientRect();
+    const px = ((evt.clientX - box.left) / box.width) * W;
+    const f = (px - padL) / plotW;
+    return Math.max(0, Math.min(dates.length - 1, Math.round(f * (dates.length - 1))));
+  };
+  hit.addEventListener("pointermove", (e) => {
+    const i = locate(e);
+    charts.forEach((c) => { if (c.spec.sharedX && spec.sharedX) c.focusAt(i); });
+    chart.focusAt(i);
+  });
+  hit.addEventListener("pointerleave", () => {
+    charts.forEach((c) => { if (c.spec.sharedX && spec.sharedX) c.blur(); });
+    chart.blur();
+  });
+
+  chart.focusAt = (i) => {
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+    tip.textContent = "";
+    const head = document.createElement("div");
+    head.className = "tip-date";
+    head.textContent = dates[i] || "";
+    tip.appendChild(head);
+
+    series.forEach((s, n) => {
+      const v = s.data[i];
+      if (v == null) { dots[n].setAttribute("opacity", 0); return; }
+      dots[n].setAttribute("cx", X(i)); dots[n].setAttribute("cy", Y(v));
+      dots[n].setAttribute("fill", cssVar(s.color)); dots[n].setAttribute("opacity", 1);
+
+      const row = document.createElement("div");
+      row.className = "tip-row";
+      const key = document.createElement("span");
+      key.className = "tip-key";
+      key.style.background = cssVar(s.color);
+      const name = document.createElement("span");
+      name.className = "tip-name";
+      name.textContent = s.label;               /* untrusted-by-default: textContent */
+      const val = document.createElement("span");
+      val.className = "tip-val";
+      val.textContent = spec.format(v);
+      row.append(key, name, val);
+      tip.appendChild(row);
+    });
+
+    const left = (X(i) / W) * host.clientWidth;
+    tip.style.opacity = 1;
+    tip.style.left = Math.min(Math.max(left + 14, 8), host.clientWidth - tip.offsetWidth - 8) + "px";
+    tip.style.top = "42px";
+  };
+  chart.blur = () => {
+    cross.setAttribute("opacity", 0);
+    dots.forEach((d) => d.setAttribute("opacity", 0));
+    tip.style.opacity = 0;
+  };
+}
+
+function legend(hostId, items) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.textContent = "";
+  for (const it of items) {
+    const wrap = document.createElement("span");
+    wrap.className = "legend-item";
+    const key = document.createElement("span");
+    key.className = "legend-key" + (it.area ? " area" : "");
+    key.style.background = cssVar(it.color);
+    const label = document.createElement("span");
+    label.textContent = it.label;
+    wrap.append(key, label);
+    host.appendChild(wrap);
+  }
+}
+
+/* ------------------------------------------------------------------ render */
+function renderFigures() {
+  const s = DATA.strategies[state.focus];
+  const st = s.stats;
+  const host = document.getElementById("figures");
+  host.textContent = "";
+
+  const hero = document.createElement("div");
+  hero.className = "card hero";
+  const hl = document.createElement("div");
+  hl.className = "tile-label";
+  hl.textContent = "Total return · " + s.label;
+  const hv = document.createElement("div");
+  hv.className = "tile-value " + (st.total_return >= 0 ? "up" : "down");
+  hv.textContent = pct(st.total_return);
+  const hn = document.createElement("div");
+  hn.className = "tile-note";
+  hn.textContent = DATA.start + " → " + DATA.end + ", costs included";
+  hero.append(hl, hv, hn);
+  host.appendChild(hero);
+
+  const tiles = [
+    ["CAGR", pct(st.cagr), null],
+    ["Max drawdown", pct(st.max_drawdown), "down"],
+    ["Sharpe", num(st.sharpe), null],
+    ["Trades", String(Math.round(st.n_fills)), null],
+    ["Fees paid", money(st.total_fees), null],
+  ];
+  for (const [label, value, tone] of tiles) {
+    const card = document.createElement("div");
+    card.className = "card";
+    const l = document.createElement("div");
+    l.className = "tile-label";
+    l.textContent = label;
+    const v = document.createElement("div");
+    v.className = "tile-value" + (tone ? " " + tone : "");
+    v.textContent = value;
+    card.append(l, v);
+    host.appendChild(card);
+  }
+}
+
+function renderTables() {
+  const metrics = [
+    ["Total return", (s) => pct(s.stats.total_return)],
+    ["CAGR", (s) => pct(s.stats.cagr)],
+    ["Max drawdown", (s) => pct(s.stats.max_drawdown)],
+    ["Sharpe", (s) => num(s.stats.sharpe)],
+    ["Trades", (s) => String(Math.round(s.stats.n_fills))],
+    ["Fees paid", (s) => money(s.stats.total_fees)],
+  ];
+  const table = document.getElementById("compareTable");
+  const head = table.querySelector("thead");
+  const body = table.querySelector("tbody");
+  head.textContent = ""; body.textContent = "";
+
+  const hr = document.createElement("tr");
+  hr.appendChild(document.createElement("th")).textContent = "Strategy";
+  for (const [name] of metrics) hr.appendChild(document.createElement("th")).textContent = name;
+  head.appendChild(hr);
+
+  for (const key of KEYS) {
+    const s = DATA.strategies[key];
+    const tr = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    const swatch = document.createElement("span");
+    swatch.className = "row-key";
+    swatch.style.background = cssVar(COLOR[key]);
+    nameCell.appendChild(swatch);
+    nameCell.appendChild(document.createTextNode(s.label));
+    tr.appendChild(nameCell);
+    for (const [, fn] of metrics) tr.appendChild(document.createElement("td")).textContent = fn(s);
+    body.appendChild(tr);
+  }
+
+  const trades = DATA.strategies[state.focus].trades;
+  document.getElementById("tradeCount").textContent = "· " + DATA.strategies[state.focus].label + ", " + trades.length + " fills";
+  const tt = document.getElementById("tradesTable");
+  const th = tt.querySelector("thead");
+  const tb = tt.querySelector("tbody");
+  th.textContent = ""; tb.textContent = "";
+  const hrow = document.createElement("tr");
+  for (const c of ["Date", "Side", "Shares", "Price", "Fee"]) hrow.appendChild(document.createElement("th")).textContent = c;
+  th.appendChild(hrow);
+  for (const t of trades) {
+    const tr = document.createElement("tr");
+    for (const cell of [t.date, t.side, num(t.qty, 2), "$" + num(t.price), "$" + num(t.fee)]) {
+      tr.appendChild(document.createElement("td")).textContent = cell;
+    }
+    tb.appendChild(tr);
+  }
+}
+
+function renderAll() {
+  charts.length = 0;
+  document.querySelectorAll(".tip").forEach((t) => t.remove());
+
+  document.getElementById("title").textContent = DATA.symbol + " · research dashboard";
+  document.getElementById("subtitle").textContent =
+    DATA.dates.length + " daily bars · " + DATA.start + " to " + DATA.end + " · generated " + DATA.generated;
+
+  const equitySeries = KEYS.map((k) => ({
+    key: k, label: DATA.strategies[k].label, values: DATA.strategies[k].equity, color: COLOR[k],
+  }));
+  const ddSeries = KEYS.map((k) => ({
+    key: k, label: DATA.strategies[k].label, values: DATA.strategies[k].drawdown, color: COLOR[k], area: true,
+  }));
+
+  renderFigures();
+  legend("equityLegend", equitySeries);
+  legend("ddLegend", ddSeries.map((s) => ({ ...s, area: true })));
+  legend("priceLegend", [
+    { label: "Close", color: "--series-1" },
+    { label: "SMA 20", color: "--series-2" },
+    { label: "SMA 50", color: "--series-3" },
+  ]);
+
+  drawChart({ host: "equityChart", series: equitySeries, height: 270, sharedX: true, format: money, aria: "Equity curve by strategy" });
+  drawChart({ host: "ddChart", series: ddSeries, height: 180, sharedX: true, zeroTop: true, format: (v) => v.toFixed(0) + "%", aria: "Drawdown by strategy" });
+  drawChart({
+    host: "priceChart", height: 250, format: (v) => "$" + v.toFixed(0), aria: "Price with moving averages",
+    series: [
+      { label: "Close", values: DATA.price.close, color: "--series-1" },
+      { label: "SMA 20", values: DATA.price.sma20, color: "--series-2" },
+      { label: "SMA 50", values: DATA.price.sma50, color: "--series-3" },
+    ],
+  });
+  drawChart({
+    host: "rsiChart", height: 250, format: (v) => v.toFixed(0), aria: "Relative strength index",
+    series: [{ label: "RSI 14", values: DATA.price.rsi, color: "--series-1" }],
+  });
+
+  renderTables();
+}
+
+/* ------------------------------------------------------------------ chrome */
+function buildSegments() {
+  const rangeHost = document.getElementById("rangeSeg");
+  for (const r of RANGES) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = r.label;
+    b.setAttribute("aria-pressed", String(state.range === r.id));
+    b.onclick = () => { state.range = r.id; syncPressed(); renderAll(); };
+    b.dataset.group = "range"; b.dataset.id = r.id;
+    rangeHost.appendChild(b);
+  }
+  const focusHost = document.getElementById("focusSeg");
+  for (const k of KEYS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = DATA.strategies[k].label;
+    b.setAttribute("aria-pressed", String(state.focus === k));
+    b.onclick = () => { state.focus = k; syncPressed(); renderFigures(); renderTables(); };
+    b.dataset.group = "focus"; b.dataset.id = k;
+    focusHost.appendChild(b);
+  }
+}
+function syncPressed() {
+  document.querySelectorAll(".seg button").forEach((b) => {
+    const on = b.dataset.group === "range" ? state.range === b.dataset.id : state.focus === b.dataset.id;
+    b.setAttribute("aria-pressed", String(on));
+  });
+}
+
+const themeBtn = document.getElementById("themeBtn");
+function applyTheme(mode) {
+  document.documentElement.setAttribute("data-theme", mode);
+  themeBtn.textContent = mode === "dark" ? "Light theme" : "Dark theme";
+  renderAll();
+}
+themeBtn.onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+
+document.getElementById("footer").textContent =
+  "Backtest results, not advice. One symbol over one period with one parameter pair demonstrates the pipeline — it is not evidence that a strategy works. " +
+  "Costs shown are modelled (1bp fee, 5bp slippage), fills are simulated at the next bar's open, and no order here ever reached a broker.";
+
+/* Charts measure their host, so a width change needs a redraw, not a rescale. */
+let resizeTimer = null;
+let lastWidth = window.innerWidth;
+window.addEventListener("resize", () => {
+  if (window.innerWidth === lastWidth) return;
+  lastWidth = window.innerWidth;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderAll, 140);
+});
+
+applyTheme(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+buildSegments();
+</script>
+</body>
+</html>
