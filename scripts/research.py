@@ -86,7 +86,10 @@ def main() -> None:
     print(f"\n{symbol}: {len(index)} bars, {index[0].date()} to {index[-1].date()}")
     print("Walk-forward: 3y train -> 6m test, rolling. Only test windows are scored.\n")
 
-    header = f"{'strategy':<24}{'folds':>6}{'trials':>7}{'OOS ret':>9}{'sharpe':>8}{'maxDD':>8}{'keep':>7}{'DSR':>6}"
+    header = (
+        f"{'strategy':<24}{'cfgs':>5}{'evals':>7}{'OOS ret':>9}"
+        f"{'sharpe':>8}{'maxDD':>8}{'keep':>7}{'DSR':>6}{'DSRc':>6}"
+    )
     print(header)
     print("-" * len(header))
 
@@ -101,9 +104,10 @@ def main() -> None:
 
         oos_window = (result.folds[0].test_start, result.folds[-1].test_end)
         print(
-            f"{name:<24}{int(s['folds']):>6}{int(s['trials']):>7}"
+            f"{name:<24}{int(s['configs']):>5}{int(s['trials']):>7}"
             f"{s['oos_total_return']:>9.1%}{s['oos_sharpe']:>8.2f}"
-            f"{s['oos_max_drawdown']:>8.1%}{s['retention']:>7.0%}{s['deflated_sharpe']:>6.2f}"
+            f"{s['oos_max_drawdown']:>8.1%}{s['retention']:>7.0%}"
+            f"{s['deflated_sharpe']:>6.2f}{s['deflated_sharpe_by_config']:>6.2f}"
         )
         verdicts.append((name, result.verdict))
 
@@ -113,9 +117,9 @@ def main() -> None:
         benchmark = slice_result(run(bars, BuyAndHold(), **RUN_KWARGS), *oos_window).stats
         print("-" * len(header))
         print(
-            f"{'Buy & hold (benchmark)':<24}{'-':>6}{1:>7}"
+            f"{'Buy & hold (benchmark)':<24}{'-':>5}{1:>7}"
             f"{benchmark['total_return']:>9.1%}{benchmark['sharpe']:>8.2f}"
-            f"{benchmark['max_drawdown']:>8.1%}{'-':>7}{'-':>6}"
+            f"{benchmark['max_drawdown']:>8.1%}{'-':>7}{'-':>6}{'-':>6}"
         )
 
     print("\nVerdicts")
@@ -123,11 +127,15 @@ def main() -> None:
         print(f"  {name:<24} {verdict}")
 
     print(
-        "\n  keep = out-of-sample Sharpe / in-sample Sharpe (healthy is 50-70%)."
-        "\n  DSR  = deflated Sharpe: probability the result is not selection luck."
-        "\n         Below 0.95 it is not evidence, however good the return looks."
+        "\n  cfgs  = distinct parameter sets searched.   evals = cfgs x folds."
+        "\n  keep  = out-of-sample Sharpe / in-sample Sharpe (healthy is 50-70%)."
+        "\n  DSR   = deflated Sharpe counting every evaluation (conservative)."
+        "\n  DSRc  = deflated Sharpe counting distinct configurations (lenient)."
+        "\n          Below 0.95 is not evidence, however good the return looks."
+        "\n          Where the two straddle 0.95, the verdict rests on a debatable"
+        "\n          choice of N and is reported BORDERLINE rather than settled."
         "\n  Cash earns 0% here, which penalises strategies that sit flat —"
-        "\n         conservative, not flattering.\n"
+        "\n          conservative, not flattering.\n"
     )
 
 

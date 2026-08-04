@@ -131,6 +131,28 @@ class WalkForwardResult:
     oos_equity: pd.Series = field(default_factory=lambda: pd.Series(dtype=float))
     trials: int = 0
     trial_sharpes: list[float] = field(default_factory=list)
+    # Per-configuration Sharpes, keyed by parameter set. See `config_sharpes`
+    # below for why the raw evaluation count is the wrong N for a deflated
+    # Sharpe when the same grid is re-tested every fold.
+    sharpes_by_config: dict[str, list[float]] = field(default_factory=dict)
+
+    @property
+    def config_sharpes(self) -> list[float]:
+        """One Sharpe per distinct parameter set, averaged over folds.
+
+        `trial_sharpes` holds folds x grid entries — 136 for a grid of 8 over
+        17 folds. Feeding that to the deflated Sharpe overstates N: only 8
+        distinct configurations were ever searched, and re-testing them on
+        overlapping windows is not 136 independent attempts. It also muddles
+        the variance term, which then mixes spread-across-parameters with
+        spread-across-time.
+
+        Which N is correct is genuinely arguable — the walk-forward procedure
+        makes a fresh selection every fold — so both are reported and the
+        verdict uses the conservative one. Silently switching to whichever
+        number reads better would be the actual error.
+        """
+        return [sum(v) / len(v) for v in self.sharpes_by_config.values() if v]
 
     @property
     def summary(self) -> dict[str, float]:
@@ -149,6 +171,11 @@ class WalkForwardResult:
 
         drawdown = self.oos_equity / self.oos_equity.cummax() - 1.0
 
+        # Both deflated Sharpes share the return distribution's shape; only
+        # the trial count differs.
+        skew = float(returns.skew()) if len(returns) > 2 else 0.0
+        kurtosis = float(returns.kurt()) + 3.0 if len(returns) > 3 else 3.0
+
         return {
             "folds": float(len(self.folds)),
             "trials": float(self.trials),
@@ -160,12 +187,23 @@ class WalkForwardResult:
             # Negative in-sample Sharpe makes a ratio meaningless, not "good".
             "retention": (mean_test / mean_train) if mean_train > 0 else 0.0,
             "positive_folds": float(sum(1 for s in test if s > 0)) / len(test),
+            "configs": float(len(self.sharpes_by_config)),
+            # Conservative: N = every evaluation performed. Harsh, because
+            # re-testing one grid each fold is not N independent searches.
             "deflated_sharpe": deflated_sharpe(
                 per_period_sharpe,
                 self.trial_sharpes,
                 len(returns),
-                skew=float(returns.skew()) if len(returns) > 2 else 0.0,
-                kurtosis=float(returns.kurt()) + 3.0 if len(returns) > 3 else 3.0,
+                skew=skew,
+                kurtosis=kurtosis,
+            ),
+            # Lenient: N = distinct parameter sets searched.
+            "deflated_sharpe_by_config": deflated_sharpe(
+                per_period_sharpe,
+                self.config_sharpes,
+                len(returns),
+                skew=skew,
+                kurtosis=kurtosis,
             ),
         }
 
@@ -176,8 +214,20 @@ class WalkForwardResult:
             return "no folds evaluated"
         if s["mean_test_sharpe"] <= 0:
             return "REJECT — no out-of-sample edge"
-        if s["deflated_sharpe"] < 0.95:
-            return f"REJECT — deflated Sharpe {s['deflated_sharpe']:.2f} < 0.95, indistinguishable from selection luck"
+
+        strict, lenient = s["deflated_sharpe"], s["deflated_sharpe_by_config"]
+        if strict < 0.95:
+            # Flag disagreement rather than hide it: when the two trial counts
+            # straddle the threshold, the verdict rests on a debatable choice
+            # of N and deserves to be looked at, not filed under REJECT.
+            if lenient >= 0.95:
+                return (
+                    f"BORDERLINE — deflated Sharpe {strict:.2f} counting every evaluation, "
+                    f"{lenient:.2f} counting distinct configs. The verdict depends on which "
+                    "trial count you accept; re-test on unseen symbols before believing it"
+                )
+            return f"REJECT — deflated Sharpe {strict:.2f} < 0.95, indistinguishable from selection luck"
+
         if s["retention"] < HEALTHY_RETENTION:
             return f"WEAK — keeps only {s['retention']:.0%} of in-sample Sharpe"
         return "SURVIVES — worth more scrutiny, still not proof"
@@ -217,6 +267,9 @@ def walk_forward(
             )
             sharpe = scored.stats["sharpe"]
             result.trials += 1
+            result.sharpes_by_config.setdefault(repr(sorted(params.items())), []).append(
+                sharpe / math.sqrt(TRADING_DAYS_PER_YEAR)
+            )
             result.trial_sharpes.append(sharpe / math.sqrt(TRADING_DAYS_PER_YEAR))
             if sharpe > best_sharpe:
                 best_params, best_sharpe = params, sharpe
