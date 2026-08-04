@@ -9,6 +9,7 @@ data_store/
 
 # Generated report: a data snapshot, regenerate with scripts/dashboard.py
 dashboard.html
+update.log
 
 # Secrets. This repo is public: nothing below ever gets committed.
 .env

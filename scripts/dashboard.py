@@ -1,9 +1,9 @@
-"""Generate the standalone HTML dashboard.
+"""Generate the standalone HTML dashboard from the latest available data.
 
     py -3 scripts/dashboard.py [SYMBOL]
 
-Writes dashboard.html next to the repo root. Open it directly in a browser —
-no server, no network, everything embedded.
+For the unattended daily run use scripts/update.py, which wraps this with
+logging and a staleness exit code.
 """
 
 from __future__ import annotations
@@ -14,32 +14,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from stocklab.backtest import engine  # noqa: E402
-from stocklab.data.yfinance_source import YFinanceSource  # noqa: E402
-from stocklab.report.dashboard import build_payload, render_dashboard  # noqa: E402
-from stocklab.strategy.buy_and_hold import BuyAndHold  # noqa: E402
-from stocklab.strategy.sma_cross import SmaCross  # noqa: E402
-
-START, END = "2019-01-01", "2024-01-01"
+from stocklab.pipeline import refresh_and_report  # noqa: E402
 
 
 def main() -> None:
     symbol = sys.argv[1] if len(sys.argv) > 1 else "SPY"
+    info = refresh_and_report(symbol, ROOT / "dashboard.html")
 
-    bars = YFinanceSource().fetch([symbol], START, END)
-    results = {
-        "buy_hold": ("Buy & hold", engine.run(bars, BuyAndHold())),
-        "sma_cross": ("SMA 20/50", engine.run(bars, SmaCross(symbol, 20, 50))),
-    }
+    size_kb = info["path"].stat().st_size / 1024
+    print(f"wrote {info['path']} ({size_kb:,.0f} KB)")
+    print(f"  {info['bars']} bars, {info['first_bar']} to {info['last_bar']} ({info['age_days']}d old)")
+    if info["stale"]:
+        print(f"  WARNING: newest bar is {info['age_days']} days old")
 
-    payload = build_payload(symbol, bars, results)
-    path = render_dashboard(payload, ROOT / "dashboard.html")
-
-    size_kb = path.stat().st_size / 1024
-    print(f"wrote {path} ({size_kb:,.0f} KB, {len(payload['dates'])} bars)")
-    for key, (label, result) in results.items():
+    for _, (label, result) in info["results"].items():
         stats = result.stats
-        print(f"  {label:<12} return {stats['total_return']:>7.1%}   sharpe {stats['sharpe']:>5.2f}")
+        print(f"  {label:<12} return {stats['total_return']:>8.1%}   sharpe {stats['sharpe']:>5.2f}")
 
 
 if __name__ == "__main__":

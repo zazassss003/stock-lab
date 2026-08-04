@@ -15,6 +15,35 @@ pip install -r requirements.txt
 py -3 -m pytest
 ```
 
+## Staying current
+
+Data runs from 2015 to **the latest closed session** — no pinned end date. Pin
+one only when you deliberately want a frozen window for a reproducible study.
+
+```bash
+py -3 scripts/update.py SPY
+```
+
+Refreshes the data and rebuilds the dashboard. Built to run unattended: it logs
+one line per run to `update.log` and exits non-zero when the data is stale,
+because the dangerous failure is the silent one that leaves last week's
+dashboard in place looking perfectly healthy.
+
+Three rules keep a tracker honest, each learned from a real failure:
+
+- **The cache is keyed by symbol, not by date range.** Keying it by
+  `symbol_start_end` means a moving end date re-downloads all of history every
+  single day and never reuses a thing.
+- **An unclosed session is not a bar.** Its "close" is still moving, so a
+  signal derived from it changes retroactively once the session really closes.
+  Dropped, based on the session date against the current time in market hours.
+- **Bars with no prices are dropped *and reported*.** Yahoo publishes the
+  newest bar's volume before its adjustment factor, so with `auto_adjust=True`
+  that row can arrive with real volume and NaN prices. Dropping it silently is
+  how a broken feed passes for a quiet market. A recent one is re-fetched each
+  run until the provider fixes it; the last seven days are always re-fetched,
+  so a missed or late day self-heals on the next run.
+
 ## Dashboard
 
 ```bash

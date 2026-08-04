@@ -19,14 +19,15 @@ from stocklab.strategy.buy_and_hold import BuyAndHold  # noqa: E402
 from stocklab.strategy.sma_cross import SmaCross  # noqa: E402
 
 SYMBOL = "SPY"
-START, END = "2019-01-01", "2024-01-01"
 
 
 def main() -> None:
-    bars = YFinanceSource().fetch([SYMBOL], START, END)
+    bars = YFinanceSource().fetch([SYMBOL])
     close = bars[SYMBOL]["close"]
 
-    print(f"\n[1] Traced {SYMBOL}: {len(close)} bars, {START} to {END}")
+    start = close.index[0].date()
+    end = close.index[-1].date()
+    print(f"\n[1] Traced {SYMBOL}: {len(close)} bars, {start} to {end}")
     print(f"    last close {close.iloc[-1]:.2f}")
 
     print("\n[2] Indicators (latest values)")
