@@ -30,26 +30,30 @@ def log(message: str) -> None:
 
 
 def main() -> int:
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "SPY"
+    symbols = [a for a in sys.argv[1:] if not a.startswith("-")] or None
 
     try:
-        info = refresh_and_report(symbol, ROOT / "dashboard.html")
+        info = refresh_and_report(symbols, ROOT / "dashboard.html")
     except Exception:
-        log(f"{symbol} FAILED\n{traceback.format_exc()}")
+        log(f"FAILED\n{traceback.format_exc()}")
         return 1
 
     log(
-        f"{info['symbol']}  {info['bars']} bars  "
-        f"last {info['last_bar']} ({info['age_days']}d old)  "
+        f"{len(info['symbols'])} symbols  newest bar {info['age_days']}d old  "
         f"-> {info['path'].name}"
     )
 
-    if info["unpriced"]:
-        dates = ", ".join(str(d) for d in info["unpriced"])
-        log(f"{symbol} dropped {len(info['unpriced'])} unpriced session(s): {dates}")
+    for symbol, dates in info["unpriced"].items():
+        listed = ", ".join(str(d) for d in dates)
+        log(f"  {symbol} dropped {len(dates)} unpriced session(s): {listed}")
+
+    if info["failures"]:
+        for symbol, error in info["failures"].items():
+            log(f"  {symbol} FETCH FAILED: {error}")
+        return 1
 
     if info["stale"]:
-        log(f"{symbol} STALE: newest bar is {info['age_days']} days old")
+        log(f"  STALE: {info['stale_symbols']} — newest bar {info['age_days']} days old")
         return 2
     return 0
 

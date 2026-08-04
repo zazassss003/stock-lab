@@ -12,9 +12,10 @@ import pandas as pd
 
 from .backtest import engine
 from .data.yfinance_source import YFinanceSource
-from .report.dashboard import build_payload, render_dashboard
+from .report.dashboard import build_payload, build_symbol_block, render_dashboard
 from .strategy.buy_and_hold import BuyAndHold
 from .strategy.sma_cross import SmaCross
+from .universe import SYMBOLS
 
 # A US session that closed more than this many days ago means the feed, the
 # network, or the schedule is broken — not that the market was quiet.
@@ -32,36 +33,63 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = REPO_ROOT / "data_store"
 
 
-def refresh_and_report(symbol: str = "SPY", output: str | Path = "dashboard.html") -> dict:
-    """Pull the latest bars, re-run the strategies, rewrite the dashboard."""
+def refresh_and_report(
+    symbols: list[str] | None = None,
+    output: str | Path = "dashboard.html",
+) -> dict:
+    """Pull the latest bars for every symbol and rewrite the dashboard."""
+    symbols = symbols or SYMBOLS
     source = YFinanceSource(cache_dir=CACHE_DIR)
-    bars = source.fetch([symbol])
-
-    # Same band the research sweep uses: without it, drift correction alone
-    # generates a trade every bar and the fees swamp the signal.
     run_kwargs = {"rebalance_band": REBALANCE_BAND}
-    results = {
-        "buy_hold": ("Buy & hold", engine.run(bars, BuyAndHold(), **run_kwargs)),
-        "sma_cross": ("SMA 20/50", engine.run(bars, SmaCross(symbol, 20, 50), **run_kwargs)),
+
+    blocks: dict[str, dict] = {}
+    failures: dict[str, str] = {}
+    unpriced: dict[str, list] = {}
+
+    for symbol in symbols:
+        # Fetched one at a time on purpose. A shared fetch intersects the
+        # calendars, so one short-history name would silently truncate every
+        # other symbol back to its own IPO date.
+        try:
+            bars = source.fetch([symbol])
+        except Exception as error:  # a dead ticker must not sink the whole run
+            failures[symbol] = str(error)
+            continue
+
+        results = {
+            "buy_hold": ("Buy & hold", engine.run(bars, BuyAndHold(), **run_kwargs)),
+            "sma_cross": ("SMA 20/50", engine.run(bars, SmaCross(symbol, 20, 50), **run_kwargs)),
+        }
+        blocks[symbol] = build_symbol_block(symbol, bars[symbol], results)
+
+        dropped = source.dropped_unpriced.get(symbol, [])
+        if dropped:
+            unpriced[symbol] = [ts.date() for ts in dropped]
+
+    if not blocks:
+        raise RuntimeError(f"no symbols could be fetched: {failures}")
+
+    path = render_dashboard(build_payload(blocks, symbols), output)
+
+    today = pd.Timestamp.now(tz="UTC").normalize()
+    ages = {
+        symbol: (today - pd.Timestamp(block["end"], tz="UTC")).days
+        for symbol, block in blocks.items()
     }
-
-    payload = build_payload(symbol, bars, results)
-    path = render_dashboard(payload, output)
-
-    last_bar = bars[symbol].index[-1]
-    age = (pd.Timestamp.now(tz="UTC").normalize() - last_bar.normalize()).days
+    worst_age = max(ages.values())
 
     return {
-        "symbol": symbol,
+        "symbols": list(blocks),
         "path": path,
-        "bars": len(bars[symbol]),
-        "first_bar": bars[symbol].index[0].date(),
-        "last_bar": last_bar.date(),
-        "age_days": age,
-        "stale": age > STALE_AFTER_DAYS,
+        "bars": {s: len(b["dates"]) for s, b in blocks.items()},
+        "last_bar": {s: b["end"] for s, b in blocks.items()},
+        "ages": ages,
+        "age_days": worst_age,
+        "stale": worst_age > STALE_AFTER_DAYS,
+        "stale_symbols": [s for s, age in ages.items() if age > STALE_AFTER_DAYS],
         # Sessions the provider returned without usable prices. Usually the
         # newest bar, resolving itself on a later run — but if a date persists
         # here across runs, the feed is wrong and the charts are missing a day.
-        "unpriced": [ts.date() for ts in getattr(source, "dropped_unpriced", {}).get(symbol, [])],
-        "results": results,
+        "unpriced": unpriced,
+        "failures": failures,
     }

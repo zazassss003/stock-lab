@@ -15,14 +15,34 @@ pip install -r requirements.txt
 py -3 -m pytest
 ```
 
+## Tracked universe
+
+`src/stocklab/universe.py` — SPY as the benchmark plus the ten most profitable
+US companies as of 2026: GOOGL, NVDA, AAPL, MSFT, BRK-B, META, AMZN, JPM, XOM,
+BAC.
+
+**That list is survivorship-biased and must not be backtested.** These names
+were selected *because* they won; the 2015 version of the list held different
+companies, some of which since did badly. Tracking them forward is fine — that
+is what a watchlist is — but any strategy result measured on them is flattered
+by hindsight. Use SPY, or reconstruct historical index membership, for numbers
+you can believe. The warning is repeated in the module docstring and on the
+dashboard itself, so it cannot be discovered by accident later.
+
 ## Staying current
 
 Data runs from 2015 to **the latest closed session** — no pinned end date. Pin
 one only when you deliberately want a frozen window for a reproducible study.
 
 ```bash
-py -3 scripts/update.py SPY
+py -3 scripts/update.py
 ```
+
+With no arguments it refreshes the whole universe; name symbols to narrow it.
+Each symbol is fetched separately on purpose: a shared fetch intersects the
+trading calendars, so one short-history name would silently truncate every
+other symbol back to its own IPO date. A dead ticker is reported and skipped
+rather than sinking the run.
 
 Refreshes the data and rebuilds the dashboard. Built to run unattended: it logs
 one line per run to `update.log` and exits non-zero when the data is stale,
@@ -51,8 +71,10 @@ py -3 scripts/dashboard.py SPY
 ```
 
 Writes `dashboard.html` — a standalone page with no server and no external
-requests, openable straight from disk. Equity curve, drawdown, price with
-moving averages, RSI, a strategy comparison table and the full trade list.
+requests, openable straight from disk. A watchlist across the whole universe
+(last, 1D/1M/1Y change, RSI, trend), then per-symbol detail: equity curve,
+drawdown, price with moving averages, RSI, a strategy comparison table and the
+full trade list. Switch symbols from the watchlist or the selector.
 
 Design notes, since they are decisions rather than taste:
 

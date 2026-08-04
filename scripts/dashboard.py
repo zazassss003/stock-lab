@@ -18,18 +18,20 @@ from stocklab.pipeline import refresh_and_report  # noqa: E402
 
 
 def main() -> None:
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "SPY"
-    info = refresh_and_report(symbol, ROOT / "dashboard.html")
+    symbols = [a for a in sys.argv[1:] if not a.startswith("-")] or None
+    info = refresh_and_report(symbols, ROOT / "dashboard.html")
 
     size_kb = info["path"].stat().st_size / 1024
     print(f"wrote {info['path']} ({size_kb:,.0f} KB)")
-    print(f"  {info['bars']} bars, {info['first_bar']} to {info['last_bar']} ({info['age_days']}d old)")
-    if info["stale"]:
-        print(f"  WARNING: newest bar is {info['age_days']} days old")
+    print(f"  {len(info['symbols'])} symbols, newest bar {info['age_days']}d old")
 
-    for _, (label, result) in info["results"].items():
-        stats = result.stats
-        print(f"  {label:<12} return {stats['total_return']:>8.1%}   sharpe {stats['sharpe']:>5.2f}")
+    for symbol in info["symbols"]:
+        print(f"  {symbol:<7}{info['bars'][symbol]:>6} bars  through {info['last_bar'][symbol]}")
+
+    if info["failures"]:
+        print(f"  FAILED: {info['failures']}")
+    if info["stale"]:
+        print(f"  WARNING: stale symbols {info['stale_symbols']}")
 
 
 if __name__ == "__main__":

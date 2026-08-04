@@ -99,26 +99,62 @@ def test_pipeline_reports_staleness(monkeypatch, tmp_path):
         pipeline.YFinanceSource, "fetch", lambda self, symbols: {symbols[0]: bars["AAA"]}
     )
 
-    info = pipeline.refresh_and_report("AAA", tmp_path / "out.html")
+    info = pipeline.refresh_and_report(["AAA"], tmp_path / "out.html")
 
     assert info["stale"] is True
+    assert info["stale_symbols"] == ["AAA"]
     assert info["age_days"] > pipeline.STALE_AFTER_DAYS
     assert (tmp_path / "out.html").exists()
+
+
+def _current_bars(n_bars: int = 80):
+    frame = make_bars(n_bars=n_bars)["AAA"].copy()
+    today = pd.Timestamp.now(tz="UTC").normalize()
+    frame.index = pd.date_range(end=today, periods=len(frame), freq="B", tz="UTC")
+    return frame
 
 
 def test_pipeline_is_not_stale_for_current_data(monkeypatch, tmp_path):
     from stocklab import pipeline
 
-    bars = make_bars(n_bars=80)
-    today = pd.Timestamp.now(tz="UTC").normalize()
-    shifted = bars["AAA"].copy()
-    shifted.index = pd.date_range(end=today, periods=len(shifted), freq="B", tz="UTC")
-
+    frame = _current_bars()
     monkeypatch.setattr(
-        pipeline.YFinanceSource, "fetch", lambda self, symbols: {symbols[0]: shifted}
+        pipeline.YFinanceSource, "fetch", lambda self, symbols: {symbols[0]: frame}
     )
 
-    info = pipeline.refresh_and_report("AAA", tmp_path / "out.html")
+    info = pipeline.refresh_and_report(["AAA"], tmp_path / "out.html")
 
     assert info["stale"] is False
     assert info["age_days"] == 0
+
+
+def test_one_dead_ticker_does_not_sink_the_whole_run(monkeypatch, tmp_path):
+    """A delisted or mistyped symbol must not cost you every other chart."""
+    from stocklab import pipeline
+
+    frame = _current_bars()
+
+    def fetch(self, symbols):
+        if symbols[0] == "DEAD":
+            raise ValueError("no data returned")
+        return {symbols[0]: frame}
+
+    monkeypatch.setattr(pipeline.YFinanceSource, "fetch", fetch)
+
+    info = pipeline.refresh_and_report(["AAA", "DEAD", "BBB"], tmp_path / "out.html")
+
+    assert info["symbols"] == ["AAA", "BBB"]
+    assert "DEAD" in info["failures"]
+    assert (tmp_path / "out.html").exists()
+
+
+def test_pipeline_raises_when_nothing_can_be_fetched(monkeypatch, tmp_path):
+    from stocklab import pipeline
+
+    def fetch(self, symbols):
+        raise ValueError("network down")
+
+    monkeypatch.setattr(pipeline.YFinanceSource, "fetch", fetch)
+
+    with pytest.raises(RuntimeError, match="no symbols could be fetched"):
+        pipeline.refresh_and_report(["AAA"], tmp_path / "out.html")

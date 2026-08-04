@@ -151,7 +151,21 @@
   .row-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: baseline; }
   .scroll-body { max-height: 340px; overflow-y: auto; }
   h2 { font-size: 15px; font-weight: 600; margin: 26px 0 10px; }
+  h2.first { margin-top: 0; }
   footer { margin-top: 30px; color: var(--text-muted); font-size: 12px; line-height: 1.7; }
+
+  .picker {
+    background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; min-height: 30px;
+  }
+  .bias-note {
+    font-size: 12px; color: var(--text-secondary); margin: 9px 2px 20px;
+    border-left: 2px solid var(--axis); padding-left: 10px; max-width: 74ch;
+  }
+  #watchlist tbody tr { cursor: pointer; }
+  #watchlist tbody tr[aria-selected="true"] { background: var(--hover-wash); font-weight: 600; }
+  .sym { font-weight: 600; }
+  .sub-name { color: var(--text-muted); font-weight: 400; margin-left: 7px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -166,7 +180,17 @@
     <button class="theme-btn" id="themeBtn" type="button">Dark theme</button>
   </header>
 
+  <h2 class="first">Watchlist <span class="chart-sub">— select a row to load it below</span></h2>
+  <div class="card table-wrap">
+    <table id="watchlist"><thead></thead><tbody></tbody></table>
+  </div>
+  <p class="bias-note" id="biasNote"></p>
+
   <div class="filters">
+    <div class="filter-group">
+      <span class="filter-label">Symbol</span>
+      <select id="symbolSelect" class="picker" aria-label="Symbol"></select>
+    </div>
     <div class="filter-group">
       <span class="filter-label">Range</span>
       <div class="seg" id="rangeSeg" role="group" aria-label="Date range"></div>
@@ -251,8 +275,17 @@
 <script>
 const DATA = __PAYLOAD__;
 
+/* Symbols sharing one trading calendar ship a single `dates` array. Restore
+   it per symbol here so nothing downstream has to know about the compaction. */
+if (DATA.dates) {
+  for (const s of DATA.order) {
+    if (!DATA.symbols[s].dates) DATA.symbols[s].dates = DATA.dates;
+  }
+}
+
 /* ------------------------------------------------------------------ state */
-const KEYS = Object.keys(DATA.strategies);
+const ORDER = DATA.order;
+const KEYS = Object.keys(DATA.symbols[ORDER[0]].strategies);
 const COLOR = { [KEYS[0]]: "--series-1", [KEYS[1]]: "--series-2" };
 const RANGES = [
   { id: "1y", label: "1Y", days: 252 },
@@ -260,50 +293,63 @@ const RANGES = [
   { id: "5y", label: "5Y", days: 1260 },
   { id: "all", label: "All", days: Infinity },
 ];
-let state = { range: "all", focus: KEYS[0], dataView: "price" };
+let state = { symbol: ORDER[0], range: "all", focus: KEYS[0], dataView: "price" };
+
+/* The currently selected symbol's block. Everything below reads through this,
+   so switching symbols is a state change rather than a reload. */
+const D = () => DATA.symbols[state.symbol];
 
 /* The table twin for the charts. It is not a nicety: the light-mode SMA 50
    hue sits at 2.74:1 against the surface (validator WARN), and the price
    chart's direct labels are suppressed where the three lines converge — so
-   without this table that series would be encoded by colour alone. */
-const DATA_VIEWS = [
-  {
-    id: "price",
-    label: "Price & indicators",
-    columns: ["Date", "Close", "SMA 20", "SMA 50", "RSI 14"],
-    row: (i) => [
-      DATA.dates[i],
-      num(DATA.price.close[i]),
-      num(DATA.price.sma20[i]),
-      num(DATA.price.sma50[i]),
-      num(DATA.price.rsi[i], 1),
-    ],
-  },
-  {
-    id: "equity",
-    label: "Equity & drawdown",
-    /* Qualify each drawdown column — two headers both reading "Drawdown"
-       are ambiguous, and worse for a screen reader than for the eye. */
-    columns: ["Date"].concat(
-      KEYS.flatMap((k) => [DATA.strategies[k].label, DATA.strategies[k].label + " drawdown"]),
-    ),
-    row: (i) => [DATA.dates[i]].concat(
-      KEYS.flatMap((k) => [
-        money(DATA.strategies[k].equity[i]),
-        DATA.strategies[k].drawdown[i] == null ? "—" : DATA.strategies[k].drawdown[i].toFixed(1) + "%",
-      ]),
-    ),
-  },
-];
+   without this table that series would be encoded by colour alone.
+
+   Rebuilt per symbol rather than captured once, so it always describes what
+   is actually plotted. */
+function dataViews() {
+  const d = D();
+  return [
+    {
+      id: "price",
+      label: "Price & indicators",
+      columns: ["Date", "Close", "SMA 20", "SMA 50", "RSI 14"],
+      row: (i) => [
+        d.dates[i],
+        num(d.price.close[i]),
+        num(d.price.sma20[i]),
+        num(d.price.sma50[i]),
+        num(d.price.rsi[i], 1),
+      ],
+    },
+    {
+      id: "equity",
+      label: "Equity & drawdown",
+      /* Qualify each drawdown column — two headers both reading "Drawdown"
+         are ambiguous, and worse for a screen reader than for the eye. */
+      columns: ["Date"].concat(
+        KEYS.flatMap((k) => [d.strategies[k].label, d.strategies[k].label + " drawdown"]),
+      ),
+      row: (i) => [d.dates[i]].concat(
+        KEYS.flatMap((k) => [
+          money(d.strategies[k].equity[i]),
+          d.strategies[k].drawdown[i] == null ? "—" : d.strategies[k].drawdown[i].toFixed(1) + "%",
+        ]),
+      ),
+    },
+  ];
+}
 
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const pct = (v, d = 1) => (v == null ? "—" : (v * 100).toFixed(d) + "%");
 const money = (v) => (v == null ? "—" : "$" + Math.round(v).toLocaleString("en-US"));
 const num = (v, d = 2) => (v == null ? "—" : v.toFixed(d));
 
+const signedPct = (v, d = 1) =>
+  v == null ? "—" : (v >= 0 ? "+" : "") + (v * 100).toFixed(d) + "%";
+
 function sliceStart() {
   const days = RANGES.find((r) => r.id === state.range).days;
-  return Math.max(0, DATA.dates.length - days);
+  return Math.max(0, D().dates.length - days);
 }
 
 /* ------------------------------------------------------------------ charts */
@@ -333,7 +379,7 @@ function drawChart(spec) {
   host.textContent = "";
 
   const i0 = sliceStart();
-  const dates = DATA.dates.slice(i0);
+  const dates = D().dates.slice(i0);
   const series = spec.series.map((s) => ({ ...s, data: s.values.slice(i0) }));
 
   /* viewBox units ARE pixels: a scaled viewBox shrinks 11px axis text along
@@ -520,7 +566,7 @@ function legend(hostId, items) {
 
 /* ------------------------------------------------------------------ render */
 function renderFigures() {
-  const s = DATA.strategies[state.focus];
+  const s = D().strategies[state.focus];
   const st = s.stats;
   const host = document.getElementById("figures");
   host.textContent = "";
@@ -535,7 +581,7 @@ function renderFigures() {
   hv.textContent = pct(st.total_return);
   const hn = document.createElement("div");
   hn.className = "tile-note";
-  hn.textContent = DATA.start + " → " + DATA.end + ", costs included";
+  hn.textContent = D().start + " → " + D().end + ", costs included";
   hero.append(hl, hv, hn);
   host.appendChild(hero);
 
@@ -580,7 +626,7 @@ function renderTables() {
   head.appendChild(hr);
 
   for (const key of KEYS) {
-    const s = DATA.strategies[key];
+    const s = D().strategies[key];
     const tr = document.createElement("tr");
     const nameCell = document.createElement("td");
     const swatch = document.createElement("span");
@@ -593,8 +639,9 @@ function renderTables() {
     body.appendChild(tr);
   }
 
-  const trades = DATA.strategies[state.focus].trades;
-  document.getElementById("tradeCount").textContent = "· " + DATA.strategies[state.focus].label + ", " + trades.length + " fills";
+  const trades = D().strategies[state.focus].trades;
+  document.getElementById("tradeCount").textContent =
+    "· " + state.symbol + " " + D().strategies[state.focus].label + ", " + trades.length + " fills";
   const tt = document.getElementById("tradesTable");
   const th = tt.querySelector("thead");
   const tb = tt.querySelector("tbody");
@@ -611,8 +658,61 @@ function renderTables() {
   }
 }
 
+function renderWatchlist() {
+  const table = document.getElementById("watchlist");
+  const head = table.querySelector("thead");
+  const body = table.querySelector("tbody");
+  head.textContent = "";
+  body.textContent = "";
+
+  const columns = ["Symbol", "Last", "1D", "1M", "1Y", "RSI 14", "Trend"];
+  const hr = document.createElement("tr");
+  for (const c of columns) hr.appendChild(document.createElement("th")).textContent = c;
+  head.appendChild(hr);
+
+  for (const symbol of ORDER) {
+    const block = DATA.symbols[symbol];
+    if (!block) continue;
+    const s = block.summary;
+
+    const tr = document.createElement("tr");
+    tr.setAttribute("aria-selected", String(symbol === state.symbol));
+    tr.tabIndex = 0;
+
+    const nameCell = document.createElement("td");
+    const ticker = document.createElement("span");
+    ticker.className = "sym";
+    ticker.textContent = symbol;
+    const label = document.createElement("span");
+    label.className = "sub-name";
+    label.textContent = block.name;
+    nameCell.append(ticker, label);
+    tr.appendChild(nameCell);
+
+    tr.appendChild(document.createElement("td")).textContent = num(s.last);
+
+    for (const change of [s.chg_1d, s.chg_1m, s.chg_1y]) {
+      const cell = document.createElement("td");
+      cell.textContent = signedPct(change);
+      // Sign is in the text too — colour is never the only carrier.
+      if (change != null) cell.className = change >= 0 ? "up" : "down";
+      tr.appendChild(cell);
+    }
+
+    tr.appendChild(document.createElement("td")).textContent = s.rsi == null ? "—" : num(s.rsi, 1);
+    // Arrow + word, so this reads without colour vision.
+    tr.appendChild(document.createElement("td")).textContent =
+      s.trend == null ? "—" : s.trend === "up" ? "▲ up" : "▼ down";
+
+    const select = () => { state.symbol = symbol; renderAll(); };
+    tr.onclick = select;
+    tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(); } };
+    body.appendChild(tr);
+  }
+}
+
 function renderDataTable() {
-  const view = DATA_VIEWS.find((v) => v.id === state.dataView);
+  const view = dataViews().find((v) => v.id === state.dataView);
   const table = document.getElementById("dataTable");
   const head = table.querySelector("thead");
   const body = table.querySelector("tbody");
@@ -625,7 +725,7 @@ function renderDataTable() {
 
   /* One fragment, one reflow — this can be 1,200+ rows. */
   const frag = document.createDocumentFragment();
-  for (let i = DATA.dates.length - 1; i >= sliceStart(); i--) {
+  for (let i = D().dates.length - 1; i >= sliceStart(); i--) {
     const tr = document.createElement("tr");
     for (const cell of view.row(i)) tr.appendChild(document.createElement("td")).textContent = cell;
     frag.appendChild(tr);
@@ -637,17 +737,23 @@ function renderAll() {
   charts.length = 0;
   document.querySelectorAll(".tip").forEach((t) => t.remove());
 
-  document.getElementById("title").textContent = DATA.symbol + " · research dashboard";
+  const d = D();
+  document.getElementById("title").textContent = d.symbol + " · " + d.name;
   document.getElementById("subtitle").textContent =
-    DATA.dates.length + " daily bars · " + DATA.start + " to " + DATA.end + " · generated " + DATA.generated;
+    d.dates.length + " daily bars · " + d.start + " to " + d.end +
+    (d.sector ? " · " + d.sector : "") + " · generated " + DATA.generated;
+
+  const symbolSelect = document.getElementById("symbolSelect");
+  if (symbolSelect.value !== state.symbol) symbolSelect.value = state.symbol;
 
   const equitySeries = KEYS.map((k) => ({
-    key: k, label: DATA.strategies[k].label, values: DATA.strategies[k].equity, color: COLOR[k],
+    key: k, label: d.strategies[k].label, values: d.strategies[k].equity, color: COLOR[k],
   }));
   const ddSeries = KEYS.map((k) => ({
-    key: k, label: DATA.strategies[k].label, values: DATA.strategies[k].drawdown, color: COLOR[k], area: true,
+    key: k, label: d.strategies[k].label, values: d.strategies[k].drawdown, color: COLOR[k], area: true,
   }));
 
+  renderWatchlist();
   renderFigures();
   legend("equityLegend", equitySeries);
   legend("ddLegend", ddSeries.map((s) => ({ ...s, area: true })));
@@ -662,14 +768,14 @@ function renderAll() {
   drawChart({
     host: "priceChart", height: 250, format: (v) => "$" + v.toFixed(0), aria: "Price with moving averages",
     series: [
-      { label: "Close", values: DATA.price.close, color: "--series-1" },
-      { label: "SMA 20", values: DATA.price.sma20, color: "--series-2" },
-      { label: "SMA 50", values: DATA.price.sma50, color: "--series-3" },
+      { label: "Close", values: d.price.close, color: "--series-1" },
+      { label: "SMA 20", values: d.price.sma20, color: "--series-2" },
+      { label: "SMA 50", values: d.price.sma50, color: "--series-3" },
     ],
   });
   drawChart({
     host: "rsiChart", height: 250, format: (v) => v.toFixed(0), aria: "Relative strength index",
-    series: [{ label: "RSI 14", values: DATA.price.rsi, color: "--series-1" }],
+    series: [{ label: "RSI 14", values: d.price.rsi, color: "--series-1" }],
   });
 
   renderTables();
@@ -678,6 +784,16 @@ function renderAll() {
 
 /* ------------------------------------------------------------------ chrome */
 function buildSegments() {
+  const symbolSelect = document.getElementById("symbolSelect");
+  for (const symbol of ORDER) {
+    const option = document.createElement("option");
+    option.value = symbol;
+    option.textContent = symbol + " — " + DATA.symbols[symbol].name;
+    symbolSelect.appendChild(option);
+  }
+  symbolSelect.value = state.symbol;
+  symbolSelect.onchange = () => { state.symbol = symbolSelect.value; renderAll(); };
+
   const rangeHost = document.getElementById("rangeSeg");
   for (const r of RANGES) {
     const b = document.createElement("button");
@@ -692,14 +808,14 @@ function buildSegments() {
   for (const k of KEYS) {
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = DATA.strategies[k].label;
+    b.textContent = D().strategies[k].label;
     b.setAttribute("aria-pressed", String(state.focus === k));
     b.onclick = () => { state.focus = k; syncPressed(); renderFigures(); renderTables(); };
     b.dataset.group = "focus"; b.dataset.id = k;
     focusHost.appendChild(b);
   }
   const dataHost = document.getElementById("dataSeg");
-  for (const v of DATA_VIEWS) {
+  for (const v of dataViews()) {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = v.label;
@@ -724,9 +840,17 @@ function applyTheme(mode) {
 }
 themeBtn.onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
 
+document.getElementById("biasNote").textContent =
+  "Selection-bias warning: this list is the most profitable US companies as of 2026, " +
+  "chosen with hindsight. Tracking them forward is fine — that is what a watchlist is — " +
+  "but any backtest over these names is flattered by the fact that they were picked " +
+  "because they won. The 2015 version of this list held different companies. Use SPY " +
+  "for results you can believe.";
+
 document.getElementById("footer").textContent =
   "Backtest results, not advice. One symbol over one period with one parameter pair demonstrates the pipeline — it is not evidence that a strategy works. " +
-  "Costs shown are modelled (1bp fee, 5bp slippage), fills are simulated at the next bar's open, and no order here ever reached a broker.";
+  "Costs shown are modelled (1bp fee, 5bp slippage), fills are simulated at the next bar's open, and no order here ever reached a broker. " +
+  "Every strategy in this repository has been rejected by walk-forward validation; see scripts/research.py.";
 
 /* Charts measure their host, so a width change needs a redraw, not a rescale. */
 let resizeTimer = null;
