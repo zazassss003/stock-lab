@@ -28,6 +28,11 @@ TEMPLATE = Path(__file__).with_name("template.html")
 BARS_PER_MONTH = 21
 BARS_PER_YEAR = 252
 
+# Daily history shipped to the page. Three years is the longest view offered,
+# and eleven years of bars nobody looks at was most of the file size. The cache
+# keeps everything — validation needs the depth, the dashboard does not.
+VIEW_BARS = 3 * BARS_PER_YEAR
+
 
 def _clean(values, digits: int) -> list[float | None]:
     """Round for payload size, turning NaN into null so JSON stays valid."""
@@ -53,21 +58,46 @@ def build_symbol_block(
     symbol: str,
     frame: pd.DataFrame,
     results: Mapping[str, tuple[str, BacktestResult]],
+    intraday: Mapping[str, pd.DataFrame] | None = None,
+    quote: dict | None = None,
+    view_bars: int = VIEW_BARS,
 ) -> dict:
-    """Everything the page needs about one symbol."""
+    """Everything the page needs about one symbol.
+
+    Indicators are computed on **full** history and only then trimmed to the
+    view window. Computing them on the trimmed frame instead would leave the
+    first 50 bars of every chart blank and silently change the SMA values at
+    the left edge.
+    """
     from ..features.indicators import rsi, sma
 
-    close = frame["close"]
+    close_full = frame["close"]
+    sma20_full = sma(close_full, 20)
+    sma50_full = sma(close_full, 50)
+    rsi14_full = rsi(close_full)
+
+    # Everything below is the view window only.
+    frame = frame.tail(view_bars)
+    close = close_full.tail(view_bars)
+    sma20, sma50, rsi14 = (s.tail(view_bars) for s in (sma20_full, sma50_full, rsi14_full))
+    window_start = frame.index[0]
+
     listing = BY_SYMBOL.get(symbol)
 
     strategies = {}
     for key, (label, result) in results.items():
+        # Drawdown is measured against the peak of the *whole* backtest, then
+        # trimmed. Recomputing it inside the window would reset the peak and
+        # understate how deep the hole actually was.
+        drawdown_full = _drawdown(result.equity)
         strategies[key] = {
             "label": label,
             # Whole dollars and two-decimal percentages: the extra precision was
             # invisible on screen and cost ~250KB across the universe.
-            "equity": _clean(result.equity, 0),
-            "drawdown": _clean(_drawdown(result.equity) * 100.0, 2),
+            "equity": _clean(result.equity.tail(view_bars), 0),
+            "drawdown": _clean(drawdown_full.tail(view_bars) * 100.0, 2),
+            # Stats stay full-history: they are the backtest's result, not a
+            # property of whatever window happens to be on screen.
             "stats": {k: round(v, 6) for k, v in result.stats.items()},
             "trades": [
                 {
@@ -79,12 +109,9 @@ def build_symbol_block(
                     "fee": round(fill.fee, 2),
                 }
                 for fill in result.fills
+                if fill.ts >= window_start
             ],
         }
-
-    sma20 = sma(close, 20)
-    sma50 = sma(close, 50)
-    rsi14 = rsi(close)
 
     return {
         "symbol": symbol,
@@ -114,7 +141,30 @@ def build_symbol_block(
             ),
         },
         "strategies": strategies,
+        "intraday": _intraday_block(intraday),
+        "quote": quote,
     }
+
+
+def _intraday_block(intraday: Mapping[str, pd.DataFrame] | None) -> dict:
+    """Compact intraday series for the sub-daily ranges.
+
+    Times are stored as `YYYY-MM-DD HH:MM` in UTC. Only close and volume are
+    kept: these charts exist to show what price is doing right now, and the
+    page draws no indicators or strategy curves on them.
+    """
+    if not intraday:
+        return {}
+
+    block = {}
+    for interval, frame in intraday.items():
+        if frame is None or frame.empty:
+            continue
+        block[interval] = {
+            "times": [ts.strftime("%Y-%m-%d %H:%M") for ts in frame.index],
+            "close": _clean(frame["close"], 2),
+        }
+    return block
 
 
 def build_payload(blocks: Mapping[str, dict], order: list[str]) -> dict:

@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from .backtest import engine
+from .data.intraday import IntradaySource, last_quote
 from .data.yfinance_source import YFinanceSource
 from .report.dashboard import build_payload, build_symbol_block, render_dashboard
 from .strategy.buy_and_hold import BuyAndHold
@@ -31,16 +32,31 @@ REBALANCE_BAND = 0.02
 # start a second, empty cache there.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = REPO_ROOT / "data_store"
+INTRADAY_CACHE_DIR = CACHE_DIR / "intraday"
+
+# 1m feeds the 60-minute view, 5m feeds the 24-hour view. 60m is not fetched:
+# nothing on the page asks for it, and each interval is 11 more downloads.
+INTRADAY_INTERVALS = ("1m", "5m")
 
 
 def refresh_and_report(
     symbols: list[str] | None = None,
     output: str | Path = "dashboard.html",
+    intraday: bool = True,
 ) -> dict:
     """Pull the latest bars for every symbol and rewrite the dashboard."""
     symbols = symbols or SYMBOLS
     source = YFinanceSource(cache_dir=CACHE_DIR)
     run_kwargs = {"rebalance_band": REBALANCE_BAND}
+
+    # Intraday is presentation only — the sub-daily ranges on the dashboard.
+    # It never reaches the engine; see data/intraday.py for why.
+    intraday_source = IntradaySource(cache_dir=INTRADAY_CACHE_DIR) if intraday else None
+    intraday_bars: dict[str, dict] = {}
+    if intraday_source:
+        for interval in INTRADAY_INTERVALS:
+            for symbol, frame in intraday_source.fetch(symbols, interval).items():
+                intraday_bars.setdefault(symbol, {})[interval] = frame
 
     blocks: dict[str, dict] = {}
     failures: dict[str, str] = {}
@@ -60,7 +76,20 @@ def refresh_and_report(
             "buy_hold": ("Buy & hold", engine.run(bars, BuyAndHold(), **run_kwargs)),
             "sma_cross": ("SMA 20/50", engine.run(bars, SmaCross(symbol, 20, 50), **run_kwargs)),
         }
-        blocks[symbol] = build_symbol_block(symbol, bars[symbol], results)
+        quote = None
+        if intraday_source:
+            try:
+                quote = last_quote(symbol)
+            except Exception:
+                quote = None  # a missing live quote is cosmetic, never fatal
+
+        blocks[symbol] = build_symbol_block(
+            symbol,
+            bars[symbol],
+            results,
+            intraday=intraday_bars.get(symbol),
+            quote=quote,
+        )
 
         dropped = source.dropped_unpriced.get(symbol, [])
         if dropped:
