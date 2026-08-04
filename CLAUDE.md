@@ -28,6 +28,12 @@ lose real money. Do not relax them for convenience.
    to flip, by hand, much later.
 5. **Tuning data and evaluation data are disjoint.** Anything tuned on a period
    must be reported on a later, untouched period. Say which is which in output.
+6. **`docs/SPEC.zh-TW.md` ships with the change that affects it.** It is the
+   owner-facing manual, in Traditional Chinese, written for someone who does
+   not read code. A behaviour change, a new script, a renamed flag, a changed
+   schedule or default — all require updating it in the same commit, including
+   its version table. A stale manual is worse than none: it reads as
+   authoritative while being wrong.
 
 ## Layout
 
@@ -38,7 +44,9 @@ src/stocklab/
   strategy/    Strategy protocol + implementations; history-only input
   backtest/    the engine — treat as the test suite for every strategy
   execution/   Broker protocol; paper adapter only
+  report/      dashboard payload + self-contained HTML template
 tests/         pytest; test_no_lookahead.py is the load-bearing one
+docs/          SPEC.zh-TW.md — owner-facing manual (see rule 6)
 ```
 
 ## Conventions

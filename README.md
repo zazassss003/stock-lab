@@ -6,6 +6,11 @@ eventually paper-trade — built in four gated stages.
 **Not investment advice, and not a money machine.** It is an instrument for
 finding out whether an idea survives honest measurement. Most do not.
 
+📘 **使用說明（繁體中文）：[docs/SPEC.zh-TW.md](docs/SPEC.zh-TW.md)** — the
+owner-facing manual: what to run, how to read every number, what to do when
+something looks wrong. Written for a non-programmer. Keep it in sync (CLAUDE.md
+rule 6); this README is the technical companion, not a substitute.
+
 ## Setup
 
 ```bash
