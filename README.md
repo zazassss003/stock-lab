@@ -94,8 +94,12 @@ in proportion to how hard you looked. The benchmark row — buy & hold over the
 same out-of-sample window — is there because a strategy that beats zero but
 loses to doing nothing is not an edge, just an expensive way to own less market.
 
-**Current status: every strategy in this repo is REJECTED.** That is the
-harness working. See `scripts/research.py` output for the table.
+**Current status: every strategy in this repo is REJECTED**, and all five lose
+to buy & hold over the same out-of-sample window — the best of them returns
+roughly half. That is the harness working, and it is the normal outcome. The
+honest nuance: Donchian breakout earns a better Sharpe with a third of the
+drawdown, so it is not *worthless* — it is just not distinguishable from luck
+at 68 trials, which is a different claim from "it doesn't work".
 
 ## Strategies
 
