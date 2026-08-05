@@ -194,15 +194,66 @@ py -3 -m venv .venv
 
 追蹤清單的財報集中在 **10 月下旬**和 **1 月下旬**兩個時段。
 
+### 每日簡報 —— 每天先看這一份
+
+每天更新完之後會自動產生 **`daily_report.md`**，用記事本或任何編輯器打開。
+一整頁，30 秒可以看完：
+
+```
+stock-lab · 2026-08-05
+
+WHAT CHANGED
+  Nothing. No position would have changed today.
+
+POSITIONS · Donchian 55/20 (not validated)
+  SPY     long      771.33   exits below 729.10 (20d low), 5.8% away
+  GOOGL   flat      377.65   enters above 408.37 (55d high), 8.1% away
+  ...
+
+DATA
+  11 symbols · newest bar 2026-08-04 (1d old) · OK
+
+STATUS
+  Trading disabled (dry run) — nothing is submitted.
+  No strategy has passed validation. Positions above are
+  monitoring output, not a recommendation to act.
+```
+
+四個區塊的意思：
+
+| 區塊 | 意思 |
+|---|---|
+| **WHAT CHANGED** | **每天只有這一段是新聞。** 沒有任何部位變動時就寫 Nothing |
+| **POSITIONS** | 目前規則要求的持有狀態，以及**價格要到多少才會改變** |
+| **DATA** | 資料健康度。正常時寫 OK，有問題寫 CHECK |
+| **STATUS** | 有沒有真的下單、緊急停止有沒有啟動、策略有沒有通過驗證 |
+
+**`long` / `flat` 是規則的輸出，不是建議。**
+例如 `SPY long ... exits below 729.10` 的意思是：
+「這條規則現在處於持有狀態，要跌破 729.10 才會出場」——
+它描述的是規則會做什麼，不是說你應該買。
+
+> **為什麼這份報告不是 AI 寫的？**
+> 因為「今天做了什麼」是一條規則算出來的結果，不是判斷。
+> 程式產生的報告不可能寫錯數字；AI 轉述一次就有可能寫歪。
+> 這份報告的門檻價格，跟策略程式用的是同一段計算。
+
+想手動產生一次：
+
+```bash
+.venv\Scripts\python.exe scripts\daily_brief.py
+```
+
 ### 檢查系統有沒有正常運作
 
 打開 **`update.log`**，最下面幾行是最近的執行紀錄：
 
 ```
-2026-08-04 14:54:15  11 symbols  newest bar 4d old  -> dashboard.html
+2026-08-05 18:00:11  11 symbols  newest bar 1d old  -> dashboard.html
+  daily brief -> daily_report.md
 ```
 
-意思是：11 檔股票都更新了，最新的資料是 4 天前的，報表已重新產生。
+意思是：11 檔股票都更新了，最新的資料是 1 天前的，報表和每日簡報都已重新產生。
 
 ---
 
@@ -666,6 +717,7 @@ schtasks /delete /tn "stock-lab-daily-update" /f
 
 | 你會用到的檔案 | 說明 |
 |---|---|
+| `daily_report.md` | **每天先看這份**，30 秒看完（第 4 節） |
 | `dashboard.html` | **主要成果**，用瀏覽器打開 |
 | `research.html` | **研究簡報**，用瀏覽器打開（第 6 節） |
 | `research_store/notes.json` | AI 寫的研究筆記存放處，可自己編輯 |
@@ -677,7 +729,8 @@ schtasks /delete /tn "stock-lab-daily-update" /f
 
 | 常用指令 | 用途 |
 |---|---|
-| `scripts\update.py` | 更新資料並重新產生報表 |
+| `scripts\update.py` | 更新資料、重新產生報表與每日簡報 |
+| `scripts\daily_brief.py` | 只產生每日簡報 |
 | `scripts\dashboard.py` | 只產生報表 |
 | `scripts\research.py` | 執行策略驗證（約 2～5 分鐘） |
 | `scripts\trade.py` | 試跑交易流程（不會真的下單） |
@@ -697,3 +750,4 @@ schtasks /delete /tn "stock-lab-daily-update" /f
 | 1.3 | 2026-08-04 | 研究簡報模組補上測試：以程式檢查「交易流程不得引用 research/」這條界線，並涵蓋過期判定與超額報酬計算。順帶修正過期判定在剛好 -10% 時因浮點數誤差而不會標示的問題 |
 | 1.4 | 2026-08-04 | 第二輪驗證：把表現最好的兩個策略拿到另外十檔股票重測，結果 1／10 與 0／10。第 7 章改寫「誠實的補充」為換股測試結果，新增「回撤淺不代表厲害」；第 12 章更新完成度與限制。驗證程式本身也修掉一個會過度嚴苛的錯誤（詳見 docs/AUDIT-2026-08-04.md） |
 | 1.5 | 2026-08-05 | 時間範圍改為 60M／24H／30D／1Q／1Y／3Y，預設 3Y；新增 1 分與 5 分 K（僅供看盤，不進回測引擎）與最新報價顯示。報表的日 K 歷史截為三年，檔案由 1.8MB 降為 0.65MB；完整歷史仍保留在快取供驗證使用。兩條開發分支於本版合併，測試合計 73 項 |
+| 1.6 | 2026-08-05 | 新增每日簡報 `daily_report.md`（第 4 節）：每天自動產生，說明今天有沒有部位變動、目前規則的持有狀態與觸發門檻、資料健康度與下單狀態。刻意由程式產生而非 AI 撰寫，門檻價格與策略程式共用同一段計算。測試 90 項 |

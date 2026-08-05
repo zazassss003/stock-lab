@@ -11,6 +11,10 @@ data_store/
 dashboard.html
 update.log
 
+# Daily brief and the position state it diffs against — both regenerated
+daily_report.md
+research_store/daily_state.json
+
 # Same, for the briefing — regenerate with scripts/brief.py.
 # research_store/notes.json is deliberately NOT ignored: the notes are authored
 # content, not a derived artifact. Rerunning would produce different prose, so
