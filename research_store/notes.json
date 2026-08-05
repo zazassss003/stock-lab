@@ -1,0 +1,244 @@
+{
+  "updated": "2026-08-04T00:00:00+00:00",
+  "notes": {
+    "GOOGL": {
+      "symbol": "GOOGL",
+      "headline": "Cloud is compounding at 82%; the market is now paying attention to the bill",
+      "thesis": "Q2 2026 was an operational blowout — revenue +24% to $119.8B, operating income +30% to $40.8B, Cloud +82% to $24.8B with margin expanding to 35.6% and backlog at $514B. The stock still fell on the print because 2026 capex guidance went to $195-205B from $180-190B, pushing free cash flow negative in the quarter. The debate has moved from 'can Google win AI' to 'what does winning cost'. Up 82% over a year and 63 points ahead of SPY, this is the most crowded long in the tracked list, and it is 11.5% off its high with the 20-day average now below the 50-day.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 356.13,
+      "risks": [
+        "Capex at $205B with negative FCF means the AI return has to show up in Cloud revenue on a schedule; a single quarter of Cloud decelerating below ~50% reprices the whole thesis",
+        "Search remains the profit engine funding all of it, and query-share erosion to AI assistants would hit the funding source and the growth story at once",
+        "After +82% in a year the valuation prices execution, not optionality — an in-line quarter is now a bad quarter"
+      ],
+      "catalysts": [
+        { "date": "2026-10-27", "label": "Q3 2026 earnings — first check on the raised capex range" },
+        { "date": "2026-12-31", "label": "Initial 2027 capex framing" }
+      ],
+      "watch": [
+        "Cloud growth rate and whether the 35.6% operating margin holds as capex depreciates",
+        "Cloud backlog conversion — $514B is a promise until it is revenue",
+        "Free cash flow returning to positive",
+        "Third-party capacity spend, which management flagged as a bridge"
+      ]
+    },
+    "NVDA": {
+      "symbol": "NVDA",
+      "headline": "Record everything, and the stock is still down 15% from its high",
+      "thesis": "Q1 FY27 data centre revenue hit $75.2B, +92% year on year, and Q2 guidance of $91B ±2% is the largest quarterly guide in semiconductor history — with zero China data-centre compute assumed in it. Yet NVDA has returned 12% over a year against SPY's 19%, and trades 14.7% below its high with the 20-day average under the 50-day. That gap is the whole story: the business is executing and the multiple is compressing. The market has started treating hyperscaler capex as the ceiling rather than the tailwind, and every customer on the list is now publicly optimising spend.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 200.75,
+      "risks": [
+        "Revenue concentration — a reported ~39% of Q2 revenue came from two unnamed customers; either one slowing is a guidance event",
+        "The customers are the same names on this watchlist, and MSFT, META, GOOGL and AMZN are all being punished for capex — pressure on them transmits directly to NVDA orders",
+        "75% gross margin is an extraordinary level to defend as custom silicon from those same customers scales",
+        "China data-centre compute is already zeroed in guidance, so policy relief is upside, but any further export restriction hits other geographies"
+      ],
+      "catalysts": [
+        { "date": "2026-08-26", "label": "Q2 FY27 earnings — does the $91B guide land" },
+        { "date": "2026-11-18", "label": "Q3 FY27 earnings" }
+      ],
+      "watch": [
+        "Customer concentration disclosure in the 10-Q",
+        "Gross margin trajectory against the 74.9-75.0% guide",
+        "Sequential data-centre growth — +21% q/q was the Q1 rate",
+        "Any change in the China assumption"
+      ]
+    },
+    "AAPL": {
+      "symbol": "AAPL",
+      "headline": "Beat on almost everything, missed on Services, fell 7.4%",
+      "thesis": "FQ3 revenue of $109.4B was up 16% with EPS +29%, and iPhone at $54.25B grew 22% — a genuinely strong hardware cycle. The market did not care: the stock dropped 7.4% in the session after the print, the largest single-day fall on this watchlist. The reason is Services at $30.74B against $31.22B expected, because that is the segment carrying the valuation — the high-margin annuity the premium multiple is paid for. Gross margin of 50.1% was flattered by roughly 2 points of tariff refunds, and EPS by $0.11 from the same source, so the clean number is softer than the headline. Still up 48% over a year and 29 points ahead of SPY, but now 9% off the high with RSI at 43. The market has told you which line item it is grading.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 308.91,
+      "risks": [
+        "The Services miss is the one that matters — a second consecutive quarter below plan undermines the multiple, regardless of iPhone units",
+        "Tariff refunds contributed ~2pts of gross margin and $0.11 of EPS; these do not recur and the clean comparison next year is harder",
+        "iPad missed at $6.19B against $6.92B expected, so the halo products are not uniformly healthy",
+        "Regulatory pressure on the App Store and on default-search payments attacks Services margin directly"
+      ],
+      "catalysts": [
+        { "date": "2026-09-15", "label": "Autumn iPhone launch event (typical timing)" },
+        { "date": "2026-10-29", "label": "FQ4 2026 earnings — Services growth rate is the number" }
+      ],
+      "watch": [
+        "Services growth rate — 12% this quarter, and whether it re-accelerates",
+        "Gross margin ex-tariff-refund",
+        "Greater China revenue trend",
+        "Mac strength ($10.35B vs $8.74B expected) repeating or reverting"
+      ]
+    },
+    "MSFT": {
+      "symbol": "MSFT",
+      "headline": "Azure at 43% and the stock is down 9% on the year — the capex is doing the talking",
+      "thesis": "FQ4 revenue of $90B, +18%, EPS of $4.74 against $4.24 expected, Azure +43%, Azure crossing $100B annual revenue, backlog at $678B. On fundamentals this is the strongest print in the group. The stock is nonetheless down 8.7% over a year and 28 points behind SPY, because free cash flow fell 23% while quarterly capex hit a record $41B, and FY27 capex guidance of $255-260B is a 35% step up — roughly $25B of which is component price inflation rather than capacity. The +21% move over the past month with RSI at 74 suggests the market is starting to re-rate the growth over the spend, but the 20-day average is still under the 50-day. This is the clearest capex-versus-cash-flow argument on the list.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 464.72,
+      "risks": [
+        "$255-260B of FY27 capex against falling free cash flow — if Azure decelerates below ~35% before the spend rolls off, the equity story breaks",
+        "Roughly $25B of the increase is higher component pricing, which buys no additional capacity and cannot be cut",
+        "RSI at 74 after a 21% month means the easy re-rating has happened; entry here is not the same as entry a month ago",
+        "The $678B backlog is contracted, not delivered, and conversion depends on capacity landing on schedule"
+      ],
+      "catalysts": [
+        { "date": "2026-10-28", "label": "FQ1 2027 earnings — 45% constant-currency Azure guide to be tested" },
+        { "date": "2027-01-27", "label": "FQ2 2027 earnings" }
+      ],
+      "watch": [
+        "Azure growth against the 45% constant-currency guide",
+        "Free cash flow — the 23% decline reversing or deepening",
+        "Capex actual against the $255-260B FY27 plan",
+        "Backlog conversion rate"
+      ]
+    },
+    "BRK-B": {
+      "symbol": "BRK-B",
+      "headline": "Abel's first real capital-allocation quarter, with $397B waiting",
+      "thesis": "Berkshire ended Q1 with a record $397B of cash after selling a net $8.1B of equities, and Q1 buybacks were a token $235M. Share-count data between April and July suggests Abel stepped up repurchases materially in Q2 — possibly to $11B. That would be the first substantive signal of how the post-Buffett era allocates, and it is the only question that matters for this holding. The stock sits 0.4% off its high having returned 7.5% over a year, 11.6 points behind SPY: it has done exactly what it is supposed to do, which is lag a market driven by AI capex. RSI at 66 with the 20-day above the 50-day.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 511.54,
+      "risks": [
+        "The cash pile is a bet that better prices arrive; if they do not, it is a persistent drag on return on equity",
+        "Consensus expects Q2 EPS down 12.9% year on year — insurance underwriting and mark-to-market on the equity book both swing this line hard",
+        "Key-person transition risk is not resolved by one quarter of buybacks, and the market will re-test it at every allocation decision",
+        "Heavy AAPL exposure means part of this position duplicates another line on this watchlist"
+      ],
+      "catalysts": [
+        { "date": "2026-08-08", "label": "Q2 2026 report — buyback figure and cash balance (approximate date)" },
+        { "date": "2026-11-07", "label": "Q3 2026 report" }
+      ],
+      "watch": [
+        "Actual Q2 repurchase dollars against the ~$11B implied by share count",
+        "Cash balance direction from $397B",
+        "Any new whole-company acquisition",
+        "Equity portfolio turnover — further net selling or a reversal"
+      ]
+    },
+    "META": {
+      "symbol": "META",
+      "headline": "Revenue +28%, free cash flow $784M — the AI bill has arrived",
+      "thesis": "Q2 revenue of $60.8B grew 28% with advertising +27%, which is a healthy core business. Everything below that line is the problem. EPS of $6.18 missed $7.14, operating income fell 8% on legal and severance charges, capex hit $31.1B in the quarter, full-year guidance rose to $135-145B, and free cash flow collapsed to $784M. The stock fell almost 10% after hours and is down 19.7% over a year, 39 points behind SPY, and 29.3% off its high — by far the worst performer on this list. RSI at 37.8 puts it near oversold. This is either the best value in the group or a company spending its cash flow into a return nobody can yet measure, and the next two prints decide which.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 556.71,
+      "risks": [
+        "$784M of quarterly free cash flow on $60.8B of revenue leaves no buffer — another capex raise forces a financing conversation",
+        "The low end of the capex range rose $10B in a single quarter, which is the pattern of a company that does not yet know its own bill",
+        "Ad revenue growth of 27% is the only thing holding the story up; any deceleration there removes the argument entirely",
+        "Legal and severance charges suppressed operating income and may not be as one-off as presented"
+      ],
+      "catalysts": [
+        { "date": "2026-10-28", "label": "Q3 2026 earnings — free cash flow is the line that matters" },
+        { "date": "2027-01-27", "label": "Q4 2026 earnings and 2027 capex guide" }
+      ],
+      "watch": [
+        "Free cash flow — recovery from $784M or further deterioration",
+        "Whether the $135-145B capex range moves again",
+        "Ad revenue growth holding above ~20%",
+        "Reality Labs losses, still unaddressed in the capex debate"
+      ]
+    },
+    "AMZN": {
+      "symbol": "AMZN",
+      "headline": "AWS reaccelerated to 37% — the fastest in eighteen quarters",
+      "thesis": "Q2 revenue of $200.6B was up 20%, operating income up 43% to $27.5B, and AWS grew 36.7% to $42.2B against a 31% consensus — its best rate in four and a half years, at a 39.4% operating margin. AI and custom-chip businesses are each past a $25B run rate growing triple digits, with Anthropic and OpenAI named as anchor customers. Capex guidance rose to about $220B from $200B, but unlike META and MSFT the acceleration arrived in the same quarter as the spend, which is why the stock took it well: +12.4% over the past month, sitting 1.2% off its high with RSI at 68. Over a year it has merely matched SPY, so the re-rating is recent.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 271.58,
+      "risks": [
+        "AWS at 36.7% growth is now the expectation, not the surprise — the comparison from here is brutal",
+        "$220B capex with memory costs cited as a driver means part of the spend buys no capacity, the same dynamic hurting MSFT",
+        "Anchor AI customers are concentrated and themselves dependent on continued funding rounds",
+        "RSI 68 and 1.2% off the high leaves no margin for a disappointing print"
+      ],
+      "catalysts": [
+        { "date": "2026-10-29", "label": "Q3 2026 earnings — can AWS hold mid-30s growth" },
+        { "date": "2026-11-27", "label": "Holiday retail quarter begins" }
+      ],
+      "watch": [
+        "AWS growth rate and the 39.4% segment margin",
+        "Advertising, +26% to $19.8B, as a second high-margin engine",
+        "Capex actual against the ~$220B guide",
+        "Retail operating margin as the funding source"
+      ]
+    },
+    "JPM": {
+      "symbol": "JPM",
+      "headline": "Record $21.2B quarter, but $5.6B of it was one-off gains",
+      "thesis": "Q2 net income of $21.2B and EPS of $7.70 were the highest in the bank's history, on managed revenue up 27% to $58.0B with every business line at a record. Strip out the $4.6B Visa stake gain and $1.0B of other equity gains and the number is $16.9B, or $6.14 — still excellent, at a 23% return on tangible common equity. Net interest income of $25.6B rose 10%, and full-year NII guidance went up to roughly $105.5B from $103B. The stock has returned 19.7% over a year, essentially matching SPY, and sits 1.5% below its high. This is a well-run bank at a full price with no obvious catalyst and no obvious problem.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 351.79,
+      "risks": [
+        "$5.6B of the record quarter was non-recurring gains — the headline flatters the run rate by roughly a third",
+        "Trading and investment banking drove the beat, and both are the most cyclical revenue lines in the bank",
+        "23% ROTCE is a peak-cycle number; credit normalisation from here works against it",
+        "Raised NII guidance assumes the rate path holds; cuts compress the largest revenue line"
+      ],
+      "catalysts": [
+        { "date": "2026-10-13", "label": "Q3 2026 earnings — clean NII run rate without one-offs" },
+        { "date": "2027-01-14", "label": "Q4 2026 earnings and 2027 NII guide" }
+      ],
+      "watch": [
+        "Net interest income against the ~$105.5B full-year path",
+        "Credit provisions and card charge-off rate",
+        "Whether trading revenue holds without the volatility that produced it",
+        "Buyback pace"
+      ]
+    },
+    "XOM": {
+      "symbol": "XOM",
+      "headline": "$14.5B quarter on a war premium, with refining still broken",
+      "thesis": "Net income of $14.5B ($3.48/share) more than doubled year on year and was the best since 2022, driven by liquids prices adding $3.5-3.9B on the U.S.-Iran conflict. Free cash flow was $17.2B on $23.6B of operating cash flow. But adjusted EPS of $3.52 still missed by 8 cents because refinery maintenance kept Exxon from capturing the stronger fuel margins — refining profit of $4.1B was a four-year high yet well below the $5.37B expected. The stock is up 43% over a year, 24 points ahead of SPY, and 14% in the last month alone. The entire outperformance rests on a geopolitical premium that is, by construction, temporary.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 155.44,
+      "risks": [
+        "The earnings beat is a price event, not an execution event — de-escalation in the Middle East removes it in weeks, not quarters",
+        "Refining underperformed its own opportunity this quarter; the maintenance explanation needs to prove itself next quarter",
+        "Up 14% in a month with RSI at 63 means the conflict premium is already in the price, so the asymmetry now favours the downside",
+        "Upstream earnings of $9.2B assume a price deck that no company controls"
+      ],
+      "catalysts": [
+        { "date": "2026-10-30", "label": "Q3 2026 earnings — refining recovery post-maintenance" },
+        { "date": "2026-12-31", "label": "2027 capital plan" }
+      ],
+      "watch": [
+        "Refining throughput and margin capture vs the four-year-high $4.1B",
+        "Brent and the conflict premium specifically",
+        "Free cash flow cover for the dividend at a normalised price",
+        "Permian and Guyana volume growth, the part that is not price"
+      ]
+    },
+    "BAC": {
+      "symbol": "BAC",
+      "headline": "NII compounding quietly: $13.9B to $16.2B in two years",
+      "thesis": "Q2 net income of $9.1B rose 27% with EPS of $1.21 and revenue up 15% to $31.6B against $30.67B expected. Net interest income of $16.2B grew 9%, continuing an unbroken climb from $13.9B in Q2 2024 — the cleanest fundamental trend of any financial on this list. Non-interest income grew 22%, with investment banking fees up 50% to $2.1B and trading up 33% to $7.2B. Up 32% over the year, 13 points ahead of SPY, and 1.1% off its high. Less one-off noise than JPM's quarter, and correspondingly less headline drama.",
+      "written": "2026-08-04T00:00:00+00:00",
+      "source": "claude-opus-5:web",
+      "close_at_write": 61.95,
+      "risks": [
+        "The NII climb is rate-path dependent; a cutting cycle compresses it and the market prices that in advance of the reported number",
+        "Investment banking fees up 50% and trading up 33% are cyclical peaks being annualised by optimists",
+        "Consumer credit quality is the unhedged exposure if the labour market turns",
+        "Holding BAC alongside JPM concentrates a single macro bet across two lines of this watchlist"
+      ],
+      "catalysts": [
+        { "date": "2026-10-14", "label": "Q3 2026 earnings — NII trajectory" },
+        { "date": "2027-01-15", "label": "Q4 2026 earnings and 2027 guidance" }
+      ],
+      "watch": [
+        "Net interest income continuing above $16.2B",
+        "Deposit costs and mix",
+        "Consumer charge-offs",
+        "Capital return pace under current requirements"
+      ]
+    }
+  }
+}

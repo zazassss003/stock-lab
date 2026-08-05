@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stock-lab research briefing</title>
+<style>
+  /* Same role-based tokens as the dashboard, so the two pages read as one
+     system rather than two projects that happen to share a repo. */
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --border: rgba(11, 11, 11, 0.10);
+    --hover-wash: rgba(11, 11, 11, 0.04);
+    --accent: #2a78d6;
+    --delta-good: #006300;
+    --delta-bad: #d03b3b;
+    --warn-bg: rgba(235, 104, 52, 0.10);
+    --warn-fg: #a8451c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --hover-wash: rgba(255, 255, 255, 0.06);
+      --accent: #3987e5;
+      --delta-good: #0ca30c;
+      --delta-bad: #d03b3b;
+      --warn-bg: rgba(217, 89, 38, 0.14);
+      --warn-fg: #e08a5f;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --border: rgba(255, 255, 255, 0.10);
+    --hover-wash: rgba(255, 255, 255, 0.06);
+    --accent: #3987e5;
+    --delta-good: #0ca30c;
+    --delta-bad: #d03b3b;
+    --warn-bg: rgba(217, 89, 38, 0.14);
+    --warn-fg: #e08a5f;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; }
+  .brand { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+  h1 { font-size: 26px; font-weight: 600; margin: 2px 0 0; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); font-size: 13px; margin-top: 3px; }
+  .theme-btn {
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
+    border-radius: 8px; padding: 7px 13px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .theme-btn:hover { background: var(--hover-wash); }
+
+  .provenance {
+    background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 10px; padding: 13px 16px; margin-bottom: 22px;
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .provenance strong { color: var(--text-primary); font-weight: 600; }
+
+  h2 {
+    font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
+    font-weight: 600; margin: 30px 0 11px;
+  }
+
+  .table-scroll { overflow-x: auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 9px 13px; white-space: nowrap; }
+  th {
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border);
+  }
+  th:first-child, td:first-child { text-align: left; }
+  tbody tr + tr td { border-top: 1px solid var(--border); }
+  tbody tr:hover { background: var(--hover-wash); }
+  .sym { font-weight: 600; }
+  .sym-name { color: var(--text-muted); font-weight: 400; margin-left: 7px; font-size: 13px; }
+  .bench td { color: var(--text-secondary); font-style: italic; }
+  .up { color: var(--delta-good); }
+  .down { color: var(--delta-bad); }
+  .muted { color: var(--text-muted); }
+
+  .note-card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 17px 19px; margin-bottom: 13px;
+  }
+  .note-head { display: flex; align-items: baseline; gap: 11px; flex-wrap: wrap; margin-bottom: 3px; }
+  .note-sym { font-size: 16px; font-weight: 600; }
+  .note-name { color: var(--text-muted); font-size: 13px; }
+  .note-strip { margin-left: auto; font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .note-headline { font-size: 15px; font-weight: 600; margin: 7px 0 6px; line-height: 1.4; }
+  .note-thesis { color: var(--text-secondary); margin: 0 0 13px; }
+
+  .stale {
+    display: inline-block; background: var(--warn-bg); color: var(--warn-fg);
+    border-radius: 5px; padding: 2px 8px; font-size: 12px; font-weight: 600;
+  }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 16px; }
+  .col-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 5px; }
+  .col ul { margin: 0; padding-left: 17px; color: var(--text-secondary); }
+  .col li { margin-bottom: 4px; }
+  .cat-date { color: var(--text-muted); font-variant-numeric: tabular-nums; margin-right: 7px; }
+  .note-foot { margin-top: 13px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
+  .empty { color: var(--text-muted); font-style: italic; padding: 15px 19px; }
+
+  footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">stock-lab</div>
+      <h1>Research briefing</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <button class="theme-btn" id="theme">Theme</button>
+  </header>
+
+  <div class="provenance">
+    <strong>What is what.</strong> The table and the numeric strip on each card are computed
+    from cached price bars — deterministic, reproducible, and correct by construction.
+    The written notes are language-model output produced at the timestamp shown on each card;
+    they are a reading aid, they are not evidence, and nothing here feeds the backtest or the
+    paper broker. When a note and the numbers disagree, believe the numbers.
+  </div>
+
+  <h2>Tracked list</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th><th>Last</th><th>1d</th><th>1m</th><th>1y</th>
+          <th>vs SPY 1y</th><th>From high</th><th>RSI</th><th>Vol 20d</th><th>Trend</th><th>Note</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <h2>Notes</h2>
+  <div id="notes"></div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+const DATA = __PAYLOAD__;
+
+const pct = (v, digits) => v === null || v === undefined ? "—" : (v * 100).toFixed(digits === undefined ? 1 : digits) + "%";
+const signed = (v) => v === null || v === undefined ? "—" : (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+const cls = (v) => v === null || v === undefined ? "muted" : (v >= 0 ? "up" : "down");
+
+/* Every model-written string goes through textContent, never innerHTML. The
+   note store is a file an agent writes; treating its contents as markup would
+   make the page executable by whatever the model happened to emit. */
+function cell(row, text, className) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  if (className) td.className = className;
+  row.appendChild(td);
+  return td;
+}
+
+function renderTable() {
+  const tbody = document.getElementById("rows");
+  for (const { context: c, note } of DATA.rows) {
+    const tr = document.createElement("tr");
+    if (c.symbol === "SPY") tr.className = "bench";
+
+    const first = document.createElement("td");
+    const sym = document.createElement("span");
+    sym.className = "sym";
+    sym.textContent = c.symbol;
+    const name = document.createElement("span");
+    name.className = "sym-name";
+    name.textContent = c.name;
+    first.append(sym, name);
+    tr.appendChild(first);
+
+    cell(tr, c.close.toFixed(2));
+    cell(tr, signed(c.chg_1d), cls(c.chg_1d));
+    cell(tr, signed(c.chg_1m), cls(c.chg_1m));
+    cell(tr, signed(c.chg_1y), cls(c.chg_1y));
+    cell(tr, signed(c.excess_1y), cls(c.excess_1y));
+    cell(tr, pct(c.from_high), c.from_high < -0.1 ? "down" : "muted");
+    cell(tr, c.rsi === null ? "—" : c.rsi.toFixed(0));
+    cell(tr, pct(c.vol_20d, 0), "muted");
+    cell(tr, c.trend === null ? "—" : c.trend, c.trend === "up" ? "up" : "down");
+    cell(tr, note ? (note.stale_reason ? "stale" : "yes") : "—",
+         note && !note.stale_reason ? "" : "muted");
+
+    tbody.appendChild(tr);
+  }
+}
+
+function list(parent, label, items, dated) {
+  if (!items || !items.length) return;
+  const col = document.createElement("div");
+  col.className = "col";
+  const head = document.createElement("div");
+  head.className = "col-label";
+  head.textContent = label;
+  const ul = document.createElement("ul");
+  for (const item of items) {
+    const li = document.createElement("li");
+    if (dated) {
+      const d = document.createElement("span");
+      d.className = "cat-date";
+      d.textContent = item.date;
+      li.append(d, document.createTextNode(item.label));
+    } else {
+      li.textContent = item;
+    }
+    ul.appendChild(li);
+  }
+  col.append(head, ul);
+  parent.appendChild(col);
+}
+
+function renderNotes() {
+  const host = document.getElementById("notes");
+  const withNotes = DATA.rows.filter((r) => r.note);
+
+  if (!withNotes.length) {
+    const p = document.createElement("div");
+    p.className = "note-card empty";
+    p.textContent = "No notes yet. Run scripts/brief.py --prompts, feed the output to the equity-research skills, then scripts/brief.py --write.";
+    host.appendChild(p);
+    return;
+  }
+
+  for (const { context: c, note } of withNotes) {
+    const card = document.createElement("div");
+    card.className = "note-card";
+
+    const head = document.createElement("div");
+    head.className = "note-head";
+    const sym = document.createElement("span");
+    sym.className = "note-sym";
+    sym.textContent = c.symbol;
+    const name = document.createElement("span");
+    name.className = "note-name";
+    name.textContent = c.name + " · " + c.sector;
+    const strip = document.createElement("span");
+    strip.className = "note-strip";
+    strip.textContent = `${c.close.toFixed(2)}  ·  1m ${signed(c.chg_1m)}  ·  1y ${signed(c.chg_1y)}  ·  RSI ${c.rsi === null ? "—" : c.rsi.toFixed(0)}`;
+    head.append(sym, name, strip);
+    card.appendChild(head);
+
+    if (note.stale_reason) {
+      const flag = document.createElement("div");
+      flag.className = "stale";
+      flag.textContent = "STALE — " + note.stale_reason;
+      card.appendChild(flag);
+    }
+
+    const headline = document.createElement("div");
+    headline.className = "note-headline";
+    headline.textContent = note.headline;
+    card.appendChild(headline);
+
+    const thesis = document.createElement("p");
+    thesis.className = "note-thesis";
+    thesis.textContent = note.thesis;
+    card.appendChild(thesis);
+
+    const cols = document.createElement("div");
+    cols.className = "cols";
+    list(cols, "Catalysts", note.catalysts, true);
+    list(cols, "Risks", note.risks, false);
+    list(cols, "Watch", note.watch, false);
+    card.appendChild(cols);
+
+    const foot = document.createElement("div");
+    foot.className = "note-foot";
+    foot.textContent = `Written ${note.written.slice(0, 10)} (${note.age_days}d ago) at ${note.close_at_write.toFixed(2)}, ${signed(note.drift)} since · source: ${note.source}`;
+    card.appendChild(foot);
+
+    host.appendChild(card);
+  }
+}
+
+document.getElementById("sub").textContent =
+  `${DATA.covered} of ${DATA.total} tracked names have a note · prices through ${DATA.last_bar} · page built ${DATA.generated}`;
+document.getElementById("foot").textContent =
+  "Generated by scripts/brief.py. Notes are model-written and unverified; prices are cached bars from data_store/. " +
+  "Nothing on this page is investment advice, and nothing on it is read by the backtest or the paper broker.";
+
+const root = document.documentElement;
+document.getElementById("theme").addEventListener("click", () => {
+  const dark = getComputedStyle(root).getPropertyValue("--page").trim() === "#0d0d0d";
+  root.setAttribute("data-theme", dark ? "light" : "dark");
+});
+
+renderTable();
+renderNotes();
+</script>
+</body>
+</html>

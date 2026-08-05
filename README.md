@@ -97,6 +97,47 @@ Design notes, since they are decisions rather than taste:
 - Light and dark are both designed sets from a CVD-validated palette, not an
   automatic inversion.
 
+## Research briefing
+
+```bash
+py -3 scripts/brief.py            # render research.html
+py -3 scripts/brief.py --prompts  # emit the per-symbol prompt pack
+```
+
+Writes `research.html` — the tracked list with a deterministic numeric strip per
+name (returns, excess vs SPY, 52-week position, RSI, realised vol, trend) joined
+to a written research note. Same self-contained contract as the dashboard.
+
+This is the only part of the repo where a language model's output is displayed,
+so the boundaries are structural rather than advisory:
+
+- **Generation and rendering are separate processes.** `--prompts` emits the
+  deterministic context; an agent runs the equity-research skills and writes
+  `research_store/notes.json`; this script renders. The model's output is a
+  reviewable file on disk, never something that appears on a page unaudited.
+- **Nothing in `strategy/`, `backtest/`, or `execution/` imports
+  `research/`.** That is what keeps rule 2 true — there is no code path from a
+  sentence a model wrote to an order.
+- **Every note stores the price it was written at.** Past 10% drift or 45 days
+  the page flags it `STALE`. A note is an argument made at a moment; left alone
+  it stops describing reality while still looking authoritative.
+- **Model-written strings render through `textContent`, never `innerHTML`.**
+  The note store is a file an agent writes; treating it as markup would make the
+  page executable by whatever the model emitted.
+
+Numbers come from `features/indicators.py`, so the briefing and the backtest
+cannot disagree about what RSI means. When a note contradicts the strip, the
+strip is right.
+
+`.claude/skills/research-briefing/` packages the refresh workflow.
+
+`tests/test_research.py` enforces the import boundary by AST-scanning the trade
+path, so the dead end is checked rather than merely agreed. It also covers the
+two calculations that fail silently: staleness, where a broken rule shows a
+confident six-week-old note with no warning, and excess return, where the
+dangerous bug is reporting absolute return in a relative column and flattering
+every name on the page.
+
 ## Validating a strategy
 
 ```bash
