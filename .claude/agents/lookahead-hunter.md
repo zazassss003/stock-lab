@@ -23,8 +23,11 @@ Look for:
    filling at the low, assuming unlimited size, or ignoring that a market order
    moves against you. The engine's contract is: decide on bar `t`, fill at bar
    `t+1`'s open, slippage always adverse.
-3. **Cost erasure** — `fee_bps=0` or `slippage_bps=0` outside a debugging
-   context, or reported results that never mention costs.
+3. **Cost erasure** — `ZERO_COST_FOR_DEBUGGING`, or any hand-built `CostModel`
+   whose commission and slippage are both zero, outside a debugging context.
+   Also: a `CostModel` that switches `regulatory_fees` off without saying why,
+   `qty_increment` left fractional for a broker that cannot fill fractions, and
+   reported results that never state which cost model produced them.
 4. **Selection effects** — a symbol list chosen because those names did well,
    a date range that starts conveniently, or parameters tuned and then reported
    on the same period they were tuned on.

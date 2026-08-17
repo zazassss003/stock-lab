@@ -169,6 +169,38 @@ honest nuance: Donchian breakout earns a better Sharpe with a third of the
 drawdown, so it is not *worthless* — it is just not distinguishable from luck
 at 68 trials, which is a different claim from "it doesn't work".
 
+## Costs
+
+```bash
+py -3 scripts/costs.py SPY --cash 20000
+```
+
+Every backtest applies a `CostModel` (`backtest/costs.py`) with four layers,
+because a single flat fee models an advertisement rather than a broker:
+
+| Layer | What it is | Where it hides |
+|---|---|---|
+| Commission | per-share with a floor and a cap, bps, or zero | the floor: `$0.005/share` is `$1` on a 10-share order |
+| Regulatory | SEC Section 31 + FINRA TAF, **sells only** | nowhere, but it is always omitted |
+| Currency | spread + wire, charged when money crosses | at a bank, so no broker comparison shows it |
+| Slippage | decided price vs filled price | in the fill, never on a statement |
+
+The engine default is `broker-neutral` (1bp + 5bp slippage): the dashboard
+compares *strategies*, and pricing one specific account would let that broker's
+minimum ticket decide which rule looks better. Presets for named schedules
+(`ibkr`, `firstrade`, `alpaca`, `subbrokerage`) exist for the other question —
+what a particular account would have returned — and `scripts/costs.py` runs all
+of them side by side.
+
+`stats` breaks the layers out (`total_commission`, `total_regulatory`,
+`total_slippage`, `fx_cost`) so a result can say which one hurt. `net_return`
+measures against money committed rather than money that arrived; it equals
+`total_return` for any model that does not price currency, which is an
+understatement rather than a measurement.
+
+`ZERO_COST_FOR_DEBUGGING` exists to isolate a bug by subtraction. Its name is
+long on purpose — a zero-cost backtest is not a good result, it is a broken one.
+
 ## Strategies
 
 | File | Idea |
@@ -203,6 +235,19 @@ Four layers, every one defaulting to *not trading*:
 
 The Alpaca adapter **refuses any non-paper endpoint in its constructor**, so
 this cannot be pointed at real money by editing a config string.
+
+Two members of the `Broker` protocol exist for venues this repo does not yet
+talk to, and both default to the permissive answer:
+
+- `qty_increment` — the smallest tradeable lot. Alpaca fills fractions and
+  reports `0.0`; a whole-share venue reports `1.0` and sizing rounds toward
+  zero, so a constrained account under-trades rather than overdrawing.
+- `is_ready()` — consulted before the strategy is called. A broker behind a
+  local gateway can be absent without raising, and "the gateway was down" must
+  never be journalled as "the strategy wanted no change": those records are
+  identical and mean opposite things.
+
+See `docs/BROKER-IBKR-ASSESSMENT.md` for what a second adapter would take.
 
 Backtest and live share one sizing function (`execution/sizing.py`). If they
 diverged, every backtest number would describe a system that isn't the one

@@ -12,9 +12,12 @@ Safety is layered, and every layer defaults to *not trading*:
 2. A **kill switch file** halts the loop regardless of configuration. Creating
    a file is something you can do in a panic from any device, without editing
    code or restarting anything.
-3. `RiskLimits` are checked per order. A breach blocks the whole cycle rather
-   than clamping the order, because a strategy asking for something absurd is
-   a bug, and shrinking it to something merely bad hides that.
+3. `RiskLimits` are checked per order. When trading is live a breach blocks the
+   whole cycle rather than clamping the order, because a strategy asking for
+   something absurd is a bug, and shrinking it to something merely bad hides
+   that. In dry run the breach is *recorded* instead — no order can leave the
+   process either way, and a dry run whose only output is one BLOCKED line per
+   day teaches nothing about what the rule wanted.
 4. Every cycle is journalled to JSONL for reconciliation — the record of what
    the system intended, to compare against what the broker actually did.
 """
@@ -101,6 +104,14 @@ class Trader:
             decision.note = f"HALTED — {halted}"
             return self._journal(decision)
 
+        # Asked before deciding anything. A broker behind a local gateway can be
+        # absent without raising, and "the gateway was down" must never be
+        # journalled as "the strategy wanted no change" — those look identical
+        # in the record and mean opposite things.
+        if not self._broker_ready():
+            decision.note = "BLOCKED — broker not ready (connection or account state)"
+            return self._journal(decision)
+
         targets = dict(self.strategy.on_bar(bars))
         decision.targets = targets
 
@@ -110,6 +121,7 @@ class Trader:
             prices=prices,
             equity=equity,
             rebalance_band=self.rebalance_band,
+            qty_increment=getattr(self.broker, "qty_increment", 0.0),
         )
         decision.intended_orders = [
             {"symbol": o.symbol, "qty": round(o.delta_shares, 6), "notional": round(o.notional, 2)}
@@ -121,22 +133,26 @@ class Trader:
             return self._journal(decision)
 
         pnl_today = equity - (self._day_start_equity or equity)
-        for order in orders:
-            broker_order = Order(
-                symbol=order.symbol,
-                side="buy" if order.delta_shares > 0 else "sell",
-                qty=abs(order.delta_shares),
-            )
-            try:
-                self.limits.check(broker_order, order.reference_price, self._orders_today, pnl_today)
-            except RuntimeError as breach:
-                # Block the entire cycle, not just this order — a partial
-                # rebalance leaves the portfolio somewhere nobody chose.
-                decision.note = f"BLOCKED — {breach}"
-                return self._journal(decision)
+        breach = self._first_breach(orders, pnl_today)
 
+        # The order of these two branches is the whole point. A breach must stop
+        # a *live* cycle outright — but in dry run nothing leaves the process
+        # anyway, so aborting here would destroy the record the dry run exists
+        # to build. Checking `enable_trading` first is what lets weeks of
+        # journal say "this is what the rule wanted, and this is the limit that
+        # would have stopped it" instead of one opaque BLOCKED line per day.
         if not self.enable_trading:
-            decision.note = "DRY RUN — trading disabled, nothing submitted"
+            decision.note = (
+                f"DRY RUN — nothing submitted; would have been blocked: {breach}"
+                if breach
+                else "DRY RUN — trading disabled, nothing submitted"
+            )
+            return self._journal(decision)
+
+        if breach:
+            # Block the entire cycle, not just the offending order — a partial
+            # rebalance leaves the portfolio somewhere nobody chose.
+            decision.note = f"BLOCKED — {breach}"
             return self._journal(decision)
 
         for order in orders:
@@ -151,6 +167,34 @@ class Trader:
         decision.traded = True
         decision.note = f"submitted {len(decision.submitted_ids)} order(s)"
         return self._journal(decision)
+
+    def _first_breach(self, orders, pnl_today: float) -> str | None:
+        """The first risk limit this cycle would violate, or None.
+
+        Reported rather than raised so the caller can decide what a breach
+        means: fatal when trading is live, informative when it is not.
+        """
+        for order in orders:
+            broker_order = Order(
+                symbol=order.symbol,
+                side="buy" if order.delta_shares > 0 else "sell",
+                qty=abs(order.delta_shares),
+            )
+            try:
+                self.limits.check(broker_order, order.reference_price, self._orders_today, pnl_today)
+            except RuntimeError as error:
+                return str(error)
+        return None
+
+    def _broker_ready(self) -> bool:
+        """A broker without `is_ready` is assumed reachable — it just answered."""
+        probe = getattr(self.broker, "is_ready", None)
+        if probe is None:
+            return True
+        try:
+            return bool(probe())
+        except Exception:
+            return False
 
     def _roll_day(self, now: pd.Timestamp, equity: float) -> None:
         if self._day != now.date():

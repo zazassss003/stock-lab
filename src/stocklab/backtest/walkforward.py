@@ -54,7 +54,16 @@ def slice_result(result: BacktestResult, start: pd.Timestamp, end: pd.Timestamp)
     """
     equity = result.equity.loc[start:end]
     fills = [f for f in result.fills if start <= f.ts <= end]
-    return BacktestResult(equity=equity, fills=fills, risk_free_annual=result.risk_free_annual)
+    # `gross_capital` is deliberately not carried across: no money crossed a
+    # currency line inside this window, so the funding cost belongs to the run,
+    # not to the slice. Charging every fold for one wire would understate all
+    # of them and make longer schedules look artificially worse.
+    return BacktestResult(
+        equity=equity,
+        fills=fills,
+        risk_free_annual=result.risk_free_annual,
+        costs=result.costs,
+    )
 
 
 def expected_max_sharpe(trial_sharpes: Sequence[float]) -> float:

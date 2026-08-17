@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 
 from .backtest import engine
+from .backtest.costs import FLAT_DEFAULT
 from .data.intraday import IntradaySource, last_quote
 from .data.yfinance_source import YFinanceSource
 from .report.dashboard import build_payload, build_symbol_block, render_dashboard
@@ -26,6 +27,13 @@ STALE_AFTER_DAYS = 5
 # Ignore drift below 2% of equity. Shared with scripts/research.py so the
 # dashboard and the validation sweep describe the same system.
 REBALANCE_BAND = 0.02
+
+# Broker-neutral costs on the dashboard, on purpose. The page compares
+# strategies against each other; pricing one specific account would let the
+# broker's minimum ticket decide which strategy looks better. Use a broker
+# preset from backtest/costs.py when the question is "what would this account
+# have returned", not "which rule is better".
+COSTS = FLAT_DEFAULT
 
 # Anchored to the repo, not the working directory: a scheduled run launches
 # from wherever the scheduler chooses, and a relative cache path would quietly
@@ -47,7 +55,7 @@ def refresh_and_report(
     """Pull the latest bars for every symbol and rewrite the dashboard."""
     symbols = symbols or SYMBOLS
     source = YFinanceSource(cache_dir=CACHE_DIR)
-    run_kwargs = {"rebalance_band": REBALANCE_BAND}
+    run_kwargs = {"rebalance_band": REBALANCE_BAND, "costs": COSTS}
 
     # Intraday is presentation only — the sub-daily ranges on the dashboard.
     # It never reaches the engine; see data/intraday.py for why.
@@ -98,7 +106,7 @@ def refresh_and_report(
     if not blocks:
         raise RuntimeError(f"no symbols could be fetched: {failures}")
 
-    path = render_dashboard(build_payload(blocks, symbols), output)
+    path = render_dashboard(build_payload(blocks, symbols, costs=COSTS.describe()), output)
 
     today = pd.Timestamp.now(tz="UTC").normalize()
     ages = {

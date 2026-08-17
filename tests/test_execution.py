@@ -11,6 +11,7 @@ import json
 import pandas as pd
 import pytest
 
+from stocklab.backtest.costs import FLAT_DEFAULT, CostModel
 from stocklab.execution import RiskLimits, SimulatedBroker, Trader, compute_orders
 from stocklab.execution.broker import Order
 
@@ -63,10 +64,10 @@ def test_rebalance_band_suppresses_small_drift():
     assert compute_orders(**common, rebalance_band=0.02) == []
 
 
-def _allocate_fully(fee_bps: float, slippage_bps: float, cash_buffer: float) -> float:
+def _allocate_fully(costs: CostModel, cash_buffer: float) -> float:
     """Cash left after putting 100% of equity to work. Negative = overdrawn."""
     price = 250.0
-    broker = SimulatedBroker(cash=100_000.0, fee_bps=fee_bps, slippage_bps=slippage_bps)
+    broker = SimulatedBroker(cash=100_000.0, costs=costs)
     broker.set_prices({"AAA": price})
 
     orders = compute_orders(
@@ -85,7 +86,7 @@ def test_full_allocation_leaves_cash_for_costs_at_default_settings():
     """
     from stocklab.execution.sizing import DEFAULT_CASH_BUFFER
 
-    remaining = _allocate_fully(fee_bps=1.0, slippage_bps=5.0, cash_buffer=DEFAULT_CASH_BUFFER)
+    remaining = _allocate_fully(FLAT_DEFAULT, cash_buffer=DEFAULT_CASH_BUFFER)
     assert remaining >= 0.0, f"overdrawn by {-remaining:.2f}"
 
 
@@ -95,8 +96,19 @@ def test_the_buffer_must_exceed_round_trip_cost():
     A buffer smaller than slippage + fees still overdraws — this pins the
     relationship so nobody raises costs later without raising the buffer.
     """
-    assert _allocate_fully(fee_bps=10.0, slippage_bps=50.0, cash_buffer=0.002) < 0.0
-    assert _allocate_fully(fee_bps=10.0, slippage_bps=50.0, cash_buffer=0.01) >= 0.0
+    expensive = CostModel(name="expensive", commission_bps=10.0, slippage_bps=50.0)
+    assert _allocate_fully(expensive, cash_buffer=0.002) < 0.0
+    assert _allocate_fully(expensive, cash_buffer=0.01) >= 0.0
+
+
+def test_the_cost_model_sizes_its_own_buffer():
+    """A model that knows it is expensive must ask for a wider buffer.
+
+    The constant in `sizing` is a floor, not an answer: raising costs without
+    raising the buffer is exactly the mistake this pins down.
+    """
+    expensive = CostModel(name="expensive", commission_bps=10.0, slippage_bps=50.0)
+    assert _allocate_fully(expensive, cash_buffer=expensive.min_cash_buffer()) >= 0.0
 
 
 def test_sizing_refuses_to_act_on_worthless_account():
@@ -114,7 +126,10 @@ def test_backtest_and_live_share_one_sizing_path():
 
 
 def test_simulated_broker_applies_costs_against_you():
-    broker = SimulatedBroker(cash=1000.0, fee_bps=10.0, slippage_bps=100.0)
+    broker = SimulatedBroker(
+        cash=1000.0,
+        costs=CostModel(name="test", commission_bps=10.0, slippage_bps=100.0),
+    )
     broker.set_prices({"AAA": 10.0})
 
     broker.submit(Order("AAA", "buy", 10.0))
@@ -186,6 +201,42 @@ def test_risk_limit_blocks_the_whole_cycle_not_just_one_order():
     assert "BLOCKED" in decision.note
 
 
+def test_dry_run_records_a_breach_instead_of_aborting_on_it():
+    """The bug this pins cost twelve days of paper-trading record.
+
+    With a $1,000 notional cap against a $100,000 account, every order the rule
+    wanted breached the limit. The check ran before the `enable_trading` branch,
+    so each day journalled one opaque `BLOCKED` line and threw away the orders
+    it had just computed — the exact thing weeks of dry run exist to collect.
+
+    No order can leave the process in dry run either way, so the breach is
+    information, not a reason to stop.
+    """
+    bars, broker, trader = _trader(limits=RiskLimits(max_position_notional=100.0))
+
+    decision = trader.step(bars)
+
+    assert broker.submitted == [], "dry run must never submit, breach or not"
+    assert decision.traded is False
+    assert decision.intended_orders, "the record of what the rule wanted must survive"
+    assert "DRY RUN" in decision.note
+    assert "would have been blocked" in decision.note
+    assert "notional" in decision.note, "and which limit it was"
+
+
+def test_a_breach_still_aborts_a_live_cycle():
+    """The safety property itself, unchanged: live trading stops on a breach."""
+    bars, broker, trader = _trader(
+        enable_trading=True, limits=RiskLimits(max_position_notional=100.0)
+    )
+
+    decision = trader.step(bars)
+
+    assert broker.submitted == []
+    assert decision.traded is False
+    assert decision.note.startswith("BLOCKED")
+
+
 def test_halted_risk_limits_also_stop_trading():
     bars, broker, trader = _trader(enable_trading=True, limits=RiskLimits(halted=True))
 
@@ -231,6 +282,45 @@ def test_daily_order_cap_resets_on_a_new_day():
 
     fresh = trader.step(bars, now=pd.Timestamp("2026-08-05 14:00", tz="UTC"))
     assert "BLOCKED" not in fresh.note
+
+
+def test_an_unreachable_broker_blocks_rather_than_looking_idle():
+    """The failure this exists to prevent.
+
+    A gateway that is down and a strategy that wants no change produce the same
+    empty order list. Journalled identically, nobody can tell weeks later which
+    happened — so the loop must refuse to decide at all.
+    """
+    bars, broker, trader = _trader(
+        enable_trading=True, limits=RiskLimits(max_position_notional=1e9)
+    )
+    broker.set_ready(False)
+
+    decision = trader.step(bars)
+
+    assert decision.traded is False
+    assert broker.submitted == []
+    assert "BLOCKED" in decision.note and "not ready" in decision.note
+    assert decision.targets == {}, "must not consult the strategy either"
+
+
+def test_a_whole_share_broker_never_gets_a_fractional_order():
+    bars = make_bars(n_bars=60, symbols=("AAA",))
+    price = float(bars["AAA"]["close"].iloc[-1])
+    broker = SimulatedBroker(cash=10_000.0, qty_increment=1.0)
+    broker.set_prices({"AAA": price})
+    trader = Trader(
+        broker=broker,
+        strategy=AlwaysLong(),
+        enable_trading=True,
+        limits=RiskLimits(max_position_notional=1e9),
+    )
+
+    trader.step(bars)
+
+    assert broker.submitted
+    for order in broker.submitted:
+        assert order.qty == int(order.qty), f"{order.qty} is not a whole share"
 
 
 def test_alpaca_adapter_refuses_a_non_paper_endpoint():

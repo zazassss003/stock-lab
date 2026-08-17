@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from stocklab.backtest import engine
+from stocklab.backtest.costs import FLAT_DEFAULT, ZERO_COST_FOR_DEBUGGING
 
 from conftest import make_bars
 
@@ -92,8 +93,8 @@ def test_costs_are_applied_and_reduce_returns(bars):
         def on_bar(self, history):
             return {"AAA": 1.0}
 
-    free = engine.run(bars, AlwaysLong(), fee_bps=0.0, slippage_bps=0.0)
-    costed = engine.run(bars, AlwaysLong(), fee_bps=1.0, slippage_bps=5.0)
+    free = engine.run(bars, AlwaysLong(), costs=ZERO_COST_FOR_DEBUGGING)
+    costed = engine.run(bars, AlwaysLong(), costs=FLAT_DEFAULT)
 
     assert costed.equity.iloc[-1] < free.equity.iloc[-1]
     assert costed.stats["total_fees"] > 0.0
@@ -111,7 +112,7 @@ def test_leverage_is_rejected(bars):
 def test_buy_and_hold_tracks_the_underlying(bars):
     from stocklab.strategy.buy_and_hold import BuyAndHold
 
-    result = engine.run(bars, BuyAndHold(), fee_bps=0.0, slippage_bps=0.0)
+    result = engine.run(bars, BuyAndHold(), costs=ZERO_COST_FOR_DEBUGGING)
 
     close = bars["AAA"]["close"]
     underlying_return = close.iloc[-1] / close.iloc[1] - 1.0

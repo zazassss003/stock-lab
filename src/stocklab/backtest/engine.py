@@ -7,21 +7,26 @@ Two properties matter more than anything else here:
    and the resulting orders fill at bar ``i+1``'s open. A strategy cannot act
    on a price it could not have known, because it was never given one.
 
-2. **Costs always apply.** Fees and slippage are parameters with non-zero
-   defaults. A backtest reporting zero costs is a bug, not a good result.
+2. **Costs always apply.** The cost model is a parameter with a non-zero
+   default. A backtest reporting zero costs is a bug, not a good result.
 
 Keep both properties intact. Nearly every "too good to be true" backtest in
 existence is one of these two rules quietly broken.
 
 Modelling assumptions, stated so they are arguable rather than hidden:
 
-- **Fractional shares.** Target weights convert to fractional share counts.
-  True at Alpaca for liquid US equities; false at many brokers.
+- **Fractional shares by default.** Target weights convert to fractional share
+  counts. True at Alpaca for liquid US equities; false at many brokers — pass
+  `qty_increment=1.0` for a broker that only fills whole shares.
 - **Unlimited liquidity at the next open**, plus fixed slippage. Fine for
   large-cap ETFs, optimistic for anything thin.
 - **Cash earns `risk_free_annual`**, default 0. Leaving it at 0 penalises
   strategies that sit in cash, so it is conservative rather than flattering —
   but for an honest comparison against a real alternative, set it.
+- **The account is already in dollars** unless the cost model says otherwise.
+  With a model that prices currency (see `costs.py`), `initial_cash` is what
+  you committed and the account starts with less — the conversion is charged
+  before the first trade, which is when it really happens.
 """
 
 from __future__ import annotations
@@ -33,8 +38,9 @@ import numpy as np
 import pandas as pd
 
 from ..data.source import validate_bars
-from ..execution.sizing import compute_orders
+from ..execution.sizing import DEFAULT_CASH_BUFFER, compute_orders
 from ..strategy.base import Strategy
+from .costs import FLAT_DEFAULT, CostModel
 
 TRADING_DAYS_PER_YEAR = 252
 DAYS_PER_YEAR = 365.25
@@ -46,7 +52,12 @@ class Fill:
     symbol: str
     qty: float  # positive = bought, negative = sold, in shares
     price: float  # execution price, slippage included
-    fee: float
+    fee: float  # commission + regulatory, the total billed
+    # Broken out so a report can say *which* cost hurt. `fee` stays the total
+    # because that is what every existing consumer reads.
+    commission: float = 0.0
+    regulatory: float = 0.0
+    reference_price: float = 0.0  # the price before slippage
 
 
 @dataclass
@@ -54,6 +65,11 @@ class BacktestResult:
     equity: pd.Series
     fills: list[Fill] = field(default_factory=list)
     risk_free_annual: float = 0.0
+    costs: CostModel = FLAT_DEFAULT
+    # What was committed to the account, before the cost of getting it there.
+    # None for a sliced window: no money crossed a currency line mid-history,
+    # so charging that window for a conversion would be invention.
+    gross_capital: float | None = None
 
     @property
     def stats(self) -> dict[str, float]:
@@ -77,6 +93,13 @@ class BacktestResult:
             else 0.0
         )
 
+        # Slippage is paid in the price, not billed, so it never appears on a
+        # statement — which is exactly why it has to be reconstructed here.
+        # Left out of a cost total it is a real loss nobody can point at.
+        slippage = float(
+            sum(abs(f.qty) * abs(f.price - f.reference_price) for f in self.fills if f.reference_price)
+        )
+
         return {
             "total_return": float(total),
             "cagr": float((1.0 + total) ** (1.0 / years) - 1.0) if years > 0 else 0.0,
@@ -85,38 +108,69 @@ class BacktestResult:
             "volatility": float(returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)) if len(returns) > 1 else 0.0,
             "n_fills": float(len(self.fills)),
             "total_fees": float(sum(f.fee for f in self.fills)),
+            "total_commission": float(sum(f.commission for f in self.fills)),
+            "total_regulatory": float(sum(f.regulatory for f in self.fills)),
+            "total_slippage": slippage,
+            "fx_cost": self.fx_cost,
+            # What the account returned to whoever funded it, after paying to
+            # get the money in and out again. Equal to `total_return` whenever
+            # currency is not modelled, which is the honest default.
+            "net_return": self.net_return,
         }
+
+    @property
+    def fx_cost(self) -> float:
+        """Both currency conversions: funding the account, and closing it out."""
+        if self.gross_capital is None:
+            return 0.0
+        entry = self.costs.fx_cost(self.gross_capital)
+        final = float(self.equity.iloc[-1])
+        return entry + self.costs.fx_cost(final)
+
+    @property
+    def net_return(self) -> float:
+        """Return measured against money committed, not money that arrived."""
+        total = float(self.equity.iloc[-1] / self.equity.iloc[0] - 1.0)
+        if self.gross_capital is None or self.gross_capital <= 0:
+            return total
+
+        final = float(self.equity.iloc[-1])
+        repatriated = final - self.costs.fx_cost(final)
+        return repatriated / self.gross_capital - 1.0
 
 
 def run(
     bars: Mapping[str, pd.DataFrame],
     strategy: Strategy,
     initial_cash: float = 100_000.0,
-    fee_bps: float = 1.0,
-    slippage_bps: float = 5.0,
+    costs: CostModel = FLAT_DEFAULT,
     min_trade_notional: float = 1.0,
     rebalance_band: float = 0.0,
     risk_free_annual: float = 0.0,
+    qty_increment: float = 0.0,
 ) -> BacktestResult:
     """Replay `bars` through `strategy`, one bar at a time.
 
-    `fee_bps` and `slippage_bps` are in basis points (1 bp = 0.01%). The
-    defaults are deliberately non-zero; pass 0 only to isolate a bug, never to
-    report a result.
+    `costs` is a `CostModel` (see `costs.py`) — commission, statutory fees,
+    currency and slippage. The default charges a flat 1bp plus 5bp slippage;
+    pass a broker preset for a result about a specific account, and
+    `ZERO_COST_FOR_DEBUGGING` only to isolate a bug, never to report.
 
     `rebalance_band` suppresses trades smaller than that fraction of equity
     (0.02 = 2%). Without it a constant-weight target rebalances every single
     bar, bleeding fees to correct drift nobody asked to correct.
+
+    `qty_increment` is the smallest tradeable lot: 0 allows fractional shares,
+    1.0 forces whole ones. Fractional is the optimistic assumption — it lets
+    every target be hit exactly — so a broker that cannot do it should say so.
     """
     validate_bars(dict(bars))
-    if fee_bps < 0 or slippage_bps < 0:
-        raise ValueError("costs cannot be negative")
     if not 0.0 <= rebalance_band < 1.0:
         raise ValueError("rebalance_band must be in [0, 1)")
+    if qty_increment < 0:
+        raise ValueError("qty_increment cannot be negative")
 
     index = next(iter(bars.values())).index
-    fee_rate = fee_bps / 10_000.0
-    slip_rate = slippage_bps / 10_000.0
     daily_rf = (1.0 + risk_free_annual) ** (1.0 / TRADING_DAYS_PER_YEAR) - 1.0
 
     # Scalar prices come from numpy, not repeated `.iloc` lookups: pandas
@@ -124,7 +178,10 @@ def run(
     closes_by_symbol = {s: df["close"].to_numpy(dtype=float) for s, df in bars.items()}
     opens_by_symbol = {s: df["open"].to_numpy(dtype=float) for s, df in bars.items()}
 
-    cash = float(initial_cash)
+    # Converting the money is the first thing that happens to a foreign-funded
+    # account, and it happens whether or not a single trade follows. Charging
+    # it up front means the equity curve starts where the account really did.
+    cash = float(initial_cash) - costs.fx_cost(float(initial_cash))
     positions: dict[str, float] = {symbol: 0.0 for symbol in bars}
     fills: list[Fill] = []
     equity_points: list[float] = []
@@ -157,23 +214,37 @@ def run(
             equity=equity_at_fill,
             rebalance_band=rebalance_band,
             min_trade_notional=min_trade_notional,
+            cash_buffer=max(DEFAULT_CASH_BUFFER, costs.min_cash_buffer()),
+            qty_increment=qty_increment,
         )
 
         for order in orders:
-            # Slippage always works against us: pay up to buy, sell into the bid.
-            direction = 1.0 if order.delta_shares > 0 else -1.0
-            price = order.reference_price * (1.0 + direction * slip_rate)
+            price = costs.fill_price(order.reference_price, order.delta_shares)
             notional = order.delta_shares * price
-            fee = abs(notional) * fee_rate
+            commission, regulatory = costs.trade_cost(order.delta_shares, price)
+            fee = commission + regulatory
 
             cash -= notional + fee
             positions[order.symbol] += order.delta_shares
-            fills.append(Fill(fill_ts, order.symbol, order.delta_shares, price, fee))
+            fills.append(
+                Fill(
+                    ts=fill_ts,
+                    symbol=order.symbol,
+                    qty=order.delta_shares,
+                    price=price,
+                    fee=fee,
+                    commission=commission,
+                    regulatory=regulatory,
+                    reference_price=order.reference_price,
+                )
+            )
 
     return BacktestResult(
         equity=pd.Series(equity_points, index=index, name="equity"),
         fills=fills,
         risk_free_annual=risk_free_annual,
+        costs=costs,
+        gross_capital=float(initial_cash),
     )
 
 

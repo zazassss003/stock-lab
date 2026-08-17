@@ -22,6 +22,11 @@ PAPER_HOST = "paper-api.alpaca.markets"
 
 
 class AlpacaPaperBroker:
+    #: Alpaca fills fractional shares on liquid US equities, so sizing may aim
+    #: at a target exactly. This is the assumption the engine has always made;
+    #: it is stated here because it is Alpaca's, not everyone's.
+    qty_increment = 0.0
+
     def __init__(
         self,
         key_id: str | None = None,
@@ -86,3 +91,16 @@ class AlpacaPaperBroker:
 
     def equity(self) -> float:
         return float(self._request("GET", "/v2/account")["equity"])
+
+    def is_ready(self) -> bool:
+        """Account reachable and not restricted from trading.
+
+        REST has no connection to lose, so this is a real request rather than a
+        cached flag. `trading_blocked` catches the case the transport cannot:
+        the account answers normally and refuses every order.
+        """
+        try:
+            account = self._request("GET", "/v2/account")
+        except Exception:
+            return False
+        return account.get("status") == "ACTIVE" and not account.get("trading_blocked", False)

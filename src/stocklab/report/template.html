@@ -998,9 +998,12 @@ document.getElementById("biasNote").textContent =
   "because they won. The 2015 version of this list held different companies. Use SPY " +
   "for results you can believe.";
 
+/* The cost line comes from the payload, not from this file. A hardcoded
+   "1bp fee, 5bp slippage" stays convincing long after the engine stopped
+   charging that, which is the worst kind of wrong. */
 document.getElementById("footer").textContent =
   "Backtest results, not advice. One symbol over one period with one parameter pair demonstrates the pipeline — it is not evidence that a strategy works. " +
-  "Costs shown are modelled (1bp fee, 5bp slippage), fills are simulated at the next bar's open, and no order here ever reached a broker. " +
+  "Costs modelled — " + (DATA.costs || "unspecified") + ". Fills are simulated at the next bar's open, and no order here ever reached a broker. " +
   "Every strategy in this repository has been rejected by walk-forward validation; see scripts/research.py.";
 
 /* Charts measure their host, so a width change needs a redraw, not a rescale. */

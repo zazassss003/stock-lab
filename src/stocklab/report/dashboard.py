@@ -167,11 +167,17 @@ def _intraday_block(intraday: Mapping[str, pd.DataFrame] | None) -> dict:
     return block
 
 
-def build_payload(blocks: Mapping[str, dict], order: list[str]) -> dict:
-    """Assemble every symbol block into one JSON-serialisable document."""
+def build_payload(blocks: Mapping[str, dict], order: list[str], costs: str = "") -> dict:
+    """Assemble every symbol block into one JSON-serialisable document.
+
+    `costs` is the cost model's own description, carried to the page so the
+    footer states what was actually charged rather than what someone typed into
+    the template once.
+    """
     blocks = {symbol: dict(block) for symbol, block in blocks.items()}
     payload = {
         "generated": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d %H:%M UTC"),
+        "costs": costs,
         "order": [s for s in order if s in blocks],
         "symbols": blocks,
     }
