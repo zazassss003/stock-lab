@@ -37,6 +37,38 @@ class RiskLimits:
     max_daily_loss: float = 100.0
     halted: bool = False  # the kill switch
 
+    #: Headroom above a full allocation. A strategy may legitimately want 100%
+    #: of equity in one name, so the cap must clear that, and the slack covers
+    #: the gap between the price a decision used and the price a fill gets.
+    FULL_ALLOCATION_MARGIN = 1.10
+
+    #: A day this bad is worth stopping to look at, not a normal red day.
+    DAILY_LOSS_FRACTION = 0.02
+
+    @classmethod
+    def for_equity(cls, equity: float, max_orders_per_day: int = 10) -> "RiskLimits":
+        """Caps scaled to the account, because absolute defaults rot.
+
+        The defaults on this class are deliberately tiny — appropriate for a
+        first cautious experiment and wrong for everything after. Left alone
+        against a $100,000 account, the $1,000 notional cap breached on every
+        order a fully-invested strategy asked for, and a fortnight of dry-run
+        journal recorded nothing but the breach. A cap that can never be
+        satisfied is not a safety feature, it is an off switch nobody chose.
+
+        Deriving them from equity keeps them meaning the same thing at any
+        account size: refuse the order that asks for a multiple of what exists,
+        and stop the day that has already gone badly.
+        """
+        if equity <= 0:
+            raise ValueError(f"equity must be positive to size risk limits, got {equity}")
+
+        return cls(
+            max_position_notional=equity * cls.FULL_ALLOCATION_MARGIN,
+            max_orders_per_day=max_orders_per_day,
+            max_daily_loss=equity * cls.DAILY_LOSS_FRACTION,
+        )
+
     def check(self, order: Order, price: float, orders_today: int, pnl_today: float) -> None:
         if self.halted:
             raise RuntimeError("trading halted by kill switch")

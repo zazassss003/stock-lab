@@ -237,6 +237,48 @@ def test_a_breach_still_aborts_a_live_cycle():
     assert decision.note.startswith("BLOCKED")
 
 
+def test_equity_sized_limits_permit_a_full_allocation():
+    """The invariant the twelve wasted days violated.
+
+    A strategy that wants 100% of equity in one name is doing what it was told.
+    If the notional cap cannot accommodate that, every cycle breaches and the
+    cap has become an off switch rather than a circuit breaker.
+    """
+    limits = RiskLimits.for_equity(100_000.0)
+    full_allocation = Order(symbol="SPY", side="buy", qty=100_000.0 / 500.0)
+
+    limits.check(full_allocation, price=500.0, orders_today=0, pnl_today=0.0)
+
+
+def test_equity_sized_limits_still_refuse_a_leveraged_order():
+    """And it must remain a circuit breaker: 2x equity is a bug, not a trade."""
+    limits = RiskLimits.for_equity(100_000.0)
+    leveraged = Order(symbol="SPY", side="buy", qty=2 * 100_000.0 / 500.0)
+
+    with pytest.raises(RuntimeError, match="notional"):
+        limits.check(leveraged, price=500.0, orders_today=0, pnl_today=0.0)
+
+
+def test_equity_sized_daily_loss_tolerates_an_ordinary_red_day():
+    """The default $100 limit would halt a $100k account on a 0.1% dip.
+
+    Sized as a fraction, a normal down day passes and a genuinely bad one does
+    not — which is the distinction the limit exists to draw.
+    """
+    limits = RiskLimits.for_equity(100_000.0)
+    order = Order(symbol="SPY", side="buy", qty=1.0)
+
+    limits.check(order, price=500.0, orders_today=0, pnl_today=-900.0)
+
+    with pytest.raises(RuntimeError, match="daily loss"):
+        limits.check(order, price=500.0, orders_today=0, pnl_today=-2_500.0)
+
+
+def test_sizing_limits_needs_a_real_account():
+    with pytest.raises(ValueError, match="positive"):
+        RiskLimits.for_equity(0.0)
+
+
 def test_halted_risk_limits_also_stop_trading():
     bars, broker, trader = _trader(enable_trading=True, limits=RiskLimits(halted=True))
 

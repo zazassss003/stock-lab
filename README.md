@@ -228,10 +228,28 @@ Four layers, every one defaulting to *not trading*:
 2. **Kill switch file.** `touch HALT` in the repo root stops the loop on its
    next cycle — no code edit, no restart, doable in a panic from any device.
 3. **Risk limits per order** — position notional, orders per day, daily loss.
-   A breach blocks the whole cycle rather than shrinking the order, because a
-   strategy asking for something absurd is a bug, not a sizing problem.
+   Live, a breach blocks the whole cycle rather than shrinking the order,
+   because a strategy asking for something absurd is a bug, not a sizing
+   problem. In dry run the breach is *recorded* instead: no order can leave the
+   process either way, and aborting only discards the record the dry run exists
+   to build.
 4. **`journal.jsonl`** records every cycle for reconciliation against what the
-   broker actually did.
+   broker actually did — including cycles that failed, because a missing day and
+   a quiet day are the same line in a journal and opposite facts.
+
+Size the limits with `RiskLimits.for_equity(equity)` rather than the class
+defaults. The defaults are tiny on purpose — right for a first cautious
+experiment, wrong immediately after. Left alone, the $1,000 notional cap
+breached on every order a fully-invested strategy asked for against a $100,000
+account, and a fortnight of dry-run journal recorded nothing but the breach. A
+cap that can never be satisfied is not a safety feature; it is an off switch
+nobody chose. The same trap sits in `max_daily_loss`, whose $100 default halts a
+$100k account on a 0.1% dip.
+
+Two scheduled tasks drive it unattended: `stock-lab-daily-update` at 18:00
+refreshes data, `stock-lab-daily-trade` at 18:15 runs one dry-run cycle.
+Both allow battery starts and catch up missed runs — the original refused to
+start on battery and never retried, which cost five days of data silently.
 
 The Alpaca adapter **refuses any non-paper endpoint in its constructor**, so
 this cannot be pointed at real money by editing a config string.
